@@ -1,0 +1,113 @@
+html {
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+body {
+  margin-bottom: 60px;
+}
+
+.login-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 380px;
+}
+
+.theme-toggle-btn {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1050;
+}
+
+.login-card-animate {
+    animation: login-card-in 0.4s ease;
+}
+
+.login-logo-animate {
+    animation: loader-fade-in 0.5s ease 0.1s both;
+}
+
+@keyframes login-card-in {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes loader-fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.form-control:focus, .form-select:focus {
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+[data-bs-theme] .card,
+[data-bs-theme] .stat-card {
+    background-color: var(--bs-body-bg);
+    border-color: var(--bs-border-color);
+}
+
+[data-bs-theme] .table,
+[data-bs-theme] .table > :not(caption) > * > * {
+    background-color: transparent;
+    color: var(--bs-body-color);
+    border-color: var(--bs-border-color);
+}
+
+[data-bs-theme] .row-overdue {
+    background-color: color-mix(in srgb, var(--bs-danger) 18%, transparent) !important;
+}
+
+[data-bs-theme] .row-due-soon {
+    background-color: color-mix(in srgb, var(--bs-warning) 18%, transparent) !important;
+}
+
+[data-bs-theme] .row-pinned {
+    border-left: 4px solid var(--bs-warning) !important;
+}
+
+.dept-row {
+    cursor: grab;
+    user-select: none;
+}
+
+    .dept-row.dragging {
+        opacity: 0.5;
+    }
+
+    .dept-row.drag-over {
+        border: 2px dashed var(--bs-primary) !important;
+        background-color: var(--bs-tertiary-bg);
+    }

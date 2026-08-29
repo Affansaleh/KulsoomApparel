@@ -1,0 +1,130 @@
+﻿@using System.Security.Claims
+@using Application.DTOs.User
+@using Application.Interfaces
+@inject IUserService UserService
+@{
+    var currentUser = User.Identity?.Name ?? "User";
+    var isImpersonated = User.HasClaim(c => c.Type == "ImpersonatedFrom");
+    List<UserResponseDto> users;
+    try
+    {
+        users = (ViewData["Users"] as List<UserResponseDto>) ?? (await UserService.GetAllUsersAsync());
+    }
+    catch
+    {
+        users = new List<UserResponseDto>();
+    }
+    var currentPage = ViewContext.RouteData.Values["page"]?.ToString() ?? "";
+    string IsActive(params string[] pages)
+    {
+        var match = pages.Any(p =>
+            currentPage.Equals(p, System.StringComparison.OrdinalIgnoreCase) ||
+            currentPage.StartsWith(p + "/", System.StringComparison.OrdinalIgnoreCase));
+        return match ? " active" : "";
+    }
+}
+
+<nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom mb-4">
+    <div class="container-fluid">
+        <a class="navbar-brand d-flex align-items-center" href="/Manager/Dashboard">
+            <img src="~/img/logo.png" alt="Kulsoom Apparel" class="brand-logo me-2" />
+            <span>
+                Kulsoom Apparel
+                <small class="d-block text-muted" style="font-size:.7rem;">(SMC-Private) Limited</small>
+            </span>
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#managerNavbar"
+                aria-controls="managerNavbar" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="managerNavbar">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item"><a class="nav-link@(IsActive("/Manager/Dashboard"))" href="/Manager/Dashboard">Dashboard</a></li>
+                <li class="nav-item"><a class="nav-link@(IsActive("/Manager/History"))" href="/Manager/History">History</a></li>
+            </ul>
+
+            <ul class="navbar-nav align-items-lg-center">
+                <!-- Theme toggle -->
+                <li class="nav-item dropdown me-2">
+                    <a class="nav-link" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" id="themeToggleBtn">
+                        <span class="bi bi-circle-half" data-theme-icon></span>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><button type="button" class="dropdown-item" data-theme-option="light" onclick="setTheme('light'); return false;"><span class="bi bi-sun me-2"></span>Light</button></li>
+                        <li><button type="button" class="dropdown-item" data-theme-option="dark" onclick="setTheme('dark'); return false;"><span class="bi bi-moon-stars me-2"></span>Dark</button></li>
+                        <li><button type="button" class="dropdown-item" data-theme-option="system" onclick="setTheme('system'); return false;"><span class="bi bi-circle-half me-2"></span>System</button></li>
+                    </ul>
+                </li>
+
+                @if (isImpersonated)
+                {
+                    <li class="nav-item dropdown me-2">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="bi bi-arrow-left-right me-1"></span>Switch User
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" style="max-height:300px; overflow-y:auto;">
+                            <li>
+                                <form method="post" asp-page="/Manager/Impersonate" asp-page-handler="BackToAdmin" class="m-0">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item">
+                                        <span class="bi bi-shield-lock me-2"></span>Back to Admin
+                                    </button>
+                                </form>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            @foreach (var u in users
+                                .OrderBy(x => x.Role == "Reader" ? 0 : 1)
+                                .ThenBy(x => x.DepartmentOrderIndex)
+                                .ThenBy(x => x.Username))
+                            {
+                                <li>
+                                    <form method="post" asp-page="/Manager/Impersonate" asp-route-id="@u.Id" class="m-0">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="dropdown-item @(u.Username == currentUser ? "disabled" : "")">
+                                            <span class="bi bi-person me-2"></span>
+                                            @u.Username
+                                            <span class="text-muted small">(@u.Role)</span>
+                                        </button>
+                                    </form>
+                                </li>
+                            }
+                        </ul>
+                    </li>
+                }
+
+                <li class="nav-item dropdown me-2">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="bi bi-person-circle me-1"></span>@currentUser
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><button class="dropdown-item" data-bs-toggle="modal" data-bs-target="#logoutModal"><span class="bi bi-box-arrow-right me-2"></span>Logout</button></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<!-- Logout Confirmation Modal -->
+<div class="modal fade" id="logoutModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Logout</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to logout?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" asp-page="/Manager/Dashboard" asp-page-handler="Logout">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-danger">Logout</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

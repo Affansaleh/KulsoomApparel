@@ -1,0 +1,16 @@
+﻿/* Department Flow drag-to-reorder styling.
+   Add this to the END of site.css (or link it after site.css). */
+
+.dept-row {
+    cursor: grab;
+    user-select: none;
+}
+
+    .dept-row.dragging {
+        opacity: 0.5;
+    }
+
+    .dept-row.drag-over {
+        border: 2px dashed var(--bs-primary) !important;
+        background-color: var(--bs-tertiary-bg);
+    }

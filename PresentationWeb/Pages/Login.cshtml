@@ -1,0 +1,84 @@
+﻿@page
+@model PresentationWeb.Pages.LoginModel
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Login";
+}
+
+<div class="dropdown theme-toggle-btn">
+    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+        <i data-theme-icon class="bi bi-circle-half"></i>
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" data-theme-option="light" href="#" onclick="setTheme('light'); return false;"><i class="bi bi-sun me-2"></i>Light</a></li>
+        <li><a class="dropdown-item" data-theme-option="dark" href="#" onclick="setTheme('dark'); return false;"><i class="bi bi-moon-stars me-2"></i>Dark</a></li>
+        <li><a class="dropdown-item" data-theme-option="system" href="#" onclick="setTheme('system'); return false;"><i class="bi bi-circle-half me-2"></i>System</a></li>
+    </ul>
+</div>
+
+<div class="login-wrapper">
+    <div class="card login-card shadow-sm login-card-animate">
+        <div class="card-body p-4">
+            <div class="text-center mb-3">
+                <img src="~/img/logo.png" alt="Kulsoom Apparel (SMC-Private) Limited" style="height:70px;" class="login-logo-animate" />
+            </div>
+            <h4 class="card-title mb-1 text-center">Kulsoom Apparel</h4>
+            <p class="text-muted text-center mb-4">(SMC-Private) Limited</p>
+
+            @if (TempData["LoginSuccessMessage"] != null)
+            {
+                <div class="alert alert-success py-2" role="alert">@TempData["LoginSuccessMessage"]</div>
+            }
+
+            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+            {
+                <div class="alert alert-danger py-2" role="alert">@Model.ErrorMessage</div>
+            }
+
+            <form method="post" id="loginForm">
+                <div class="mb-3">
+                    <label class="form-label">Username</label>
+                    <input asp-for="Input.Username" class="form-control" required autofocus />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Password</label>
+                    <div class="input-group">
+                        <input asp-for="Input.Password" type="password" id="passwordInput" class="form-control" required />
+                        <button type="button" class="btn btn-outline-secondary" id="togglePasswordBtn" tabindex="-1">
+                            <i class="bi bi-eye" id="togglePasswordIcon"></i>
+                        </button>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary w-100" id="loginBtn">
+                    <span id="loginBtnText">Login</span>
+                    <span id="loginBtnSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                </button>
+            </form>
+
+            <div class="text-center mt-3">
+                <a asp-page="/ForgotPassword" class="small">Forgot password?</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById("loginForm").addEventListener("submit", function () {
+            document.getElementById("loginBtnText").classList.add("d-none");
+            document.getElementById("loginBtnSpinner").classList.remove("d-none");
+            document.getElementById("loginBtn").disabled = true;
+        });
+        document.getElementById("togglePasswordBtn").addEventListener("click", function () {
+            const input = document.getElementById("passwordInput");
+            const icon = document.getElementById("togglePasswordIcon");
+            if (input.type === "password") {
+                input.type = "text";
+                icon.className = "bi bi-eye-slash";
+            } else {
+                input.type = "password";
+                icon.className = "bi bi-eye";
+            }
+        });
+    </script>
+}

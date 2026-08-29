@@ -1,0 +1,588 @@
+@page "/Admin/ArticleDetail/{id:int}"
+@model ArticleDetailModel
+
+@{
+    ViewData["Title"] = "Article Detail";
+    var a = Model.Article!;
+
+    var totalLoss = Model.DepartmentStatuses
+        .Sum(d => d.LossQuantity ?? 0);
+
+    var qualityStatus = Model.DepartmentStatuses
+        .FirstOrDefault(d =>
+            string.Equals(
+                d.DepartmentName,
+                "Quality & Packing",
+                StringComparison.OrdinalIgnoreCase));
+
+    var aGradeTotal = a.AGradeQuantity;
+    var bGradeTotal = a.BGradeQuantity ?? 0;
+    var totalQualityOutput = aGradeTotal + bGradeTotal;
+    var qualityLoss = qualityStatus?.LossQuantity ?? 0;
+}
+
+@await Html.PartialAsync("_Navbar")
+
+<div class="container-fluid px-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h4 class="mb-0">
+            Article @a.ArticleCode
+        </h4>
+
+        <div>
+            @if (Model.CanUndo)
+            {
+                <button type="button"
+                        class="btn btn-warning btn-sm"
+                        data-bs-toggle="modal"
+                        data-bs-target="#undoLastStepModal">
+                    <span class="bi bi-arrow-counterclockwise"></span>
+                    Undo One Step
+                </button>
+            }
+
+            <a asp-page="/Admin/ArticleEdit"
+               asp-route-id="@a.Id"
+               class="btn btn-primary btn-sm">
+                <span class="bi bi-pencil"></span>
+                Edit
+            </a>
+
+            <a asp-page="/Admin/Dashboard"
+               class="btn btn-outline-secondary btn-sm">
+                <span class="bi bi-arrow-left"></span>
+                Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success py-2">
+            @TempData["SuccessMessage"]
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger py-2">
+            @TempData["ErrorMessage"]
+        </div>
+    }
+
+    <div class="row g-3">
+
+        <!-- Article information -->
+        <div class="col-lg-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Article Information</span>
+
+                    <div>
+                        @if (a.IsPinned)
+                        {
+                            <span class="badge text-bg-warning">
+                                <span class="bi bi-pin-fill"></span>
+                                Pinned
+                            </span>
+                        }
+
+                        @if (a.IsDelivered)
+                        {
+                            <span class="badge text-bg-success">
+                                Delivered
+                            </span>
+                        }
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                            <tr>
+                                <th style="width:40%;">Company</th>
+                                <td>@a.CompanyName</td>
+                            </tr>
+
+                            <tr>
+                                <th>Article Code</th>
+                                <td>@a.ArticleCode</td>
+                            </tr>
+
+                            <tr>
+                                <th>Colour</th>
+                                <td>@(a.Color ?? "—")</td>
+                            </tr>
+
+                            <tr>
+                                <th>Order Date</th>
+                                <td>@a.OrderDate.ToString("dd MMM yyyy")</td>
+                            </tr>
+
+                            <tr>
+                                <th>Delivery Date</th>
+                                <td>@a.DeliveryDate.ToString("dd MMM yyyy")</td>
+                            </tr>
+
+                            <tr>
+                                <th>Season</th>
+                                <td>@(a.Season ?? "—")</td>
+                            </tr>
+
+                            <tr>
+                                <th>Quantity</th>
+                                <td>@(a.Quantity?.ToString() ?? "—")</td>
+                            </tr>
+
+                            <tr>
+                                <th>Total Loss</th>
+                                <td>
+                                    <span class="badge text-bg-danger">
+                                        @totalLoss pieces
+                                    </span>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <th>Stitching</th>
+                                <td>
+                                    @if (!string.IsNullOrWhiteSpace(a.AssignedTeamName))
+                                    {
+                                        <span>@a.AssignedTeamName</span>
+                                    }
+                                    else
+                                    {
+                                        <span>—</span>
+                                    }
+
+                                    @if (!string.IsNullOrWhiteSpace(a.StitchedBy))
+                                    {
+                                        <span>
+                                            — Done by: @a.StitchedBy
+                                        </span>
+                                    }
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <th>Price / Piece</th>
+                                <td>
+                                    @(a.PricePerPiece?.ToString("N2") ?? "—")
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <th>Total Price</th>
+                                <td>
+                                    @(a.PriceTotal?.ToString("N2") ?? "—")
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <th>Created By</th>
+                                <td>
+                                    @a.CreatedByUsername
+                                    (@a.CreatedAt.ToString("dd MMM yyyy"))
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    @if (a.AlternateCodes.Any())
+                    {
+                        <h6 class="mt-3 mb-1">
+                            Alternate Codes
+                        </h6>
+
+                        <div>
+                            @foreach (var c in a.AlternateCodes)
+                            {
+                                <span class="badge text-bg-secondary me-1">
+                                    @c
+                                </span>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Embellishments and progress -->
+        <div class="col-lg-5">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header">
+                    Embellishments
+                </div>
+
+                <div class="card-body">
+                    <span class="badge @(a.EmbellishmentPrinting
+                        ? "text-bg-success"
+                        : "text-bg-light text-dark border") me-1">
+                        Printing
+                    </span>
+
+                    <span class="badge @(a.EmbellishmentEmbroidery
+                        ? "text-bg-success"
+                        : "text-bg-light text-dark border") me-1">
+                        Embroidery
+                    </span>
+
+                    <span class="badge @(a.EmbellishmentHandwork
+                        ? "text-bg-success"
+                        : "text-bg-light text-dark border")">
+                        Hand Work
+                    </span>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    Production Progress
+                </div>
+
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="fs-4 fw-bold">
+                            @a.DoneDepartments / @a.TotalDepartments
+                        </span>
+
+                        <span class="text-muted small">
+                            departments done
+                        </span>
+                    </div>
+
+                    @{
+                        var pct = a.TotalDepartments > 0
+                            ? (int)Math.Round(
+                                (double)a.DoneDepartments /
+                                a.TotalDepartments * 100)
+                            : 0;
+                    }
+
+                    <div class="progress" style="height:20px;">
+                        <div class="progress-bar"
+                             role="progressbar"
+                             style="width:@(pct)%;"
+                             aria-valuenow="@pct"
+                             aria-valuemin="0"
+                             aria-valuemax="100">
+                            @pct%
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fabrics -->
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    Linked Fabrics
+                </div>
+
+                <div class="card-body table-responsive">
+                    @if (a.Fabrics.Any())
+                    {
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Type</th>
+                                    <th>Invoice</th>
+                                    <th>Used Qty</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @foreach (var f in a.Fabrics)
+                                {
+                                    <tr>
+                                        <td>@f.FabricCode</td>
+                                        <td>@f.FabricType</td>
+                                        <td>@f.InvNum</td>
+                                        <td>@f.QuantityUsed</td>
+                                        <td>
+                                            @if (f.Status == "OutOfStock")
+                                            {
+                                                <span class="badge text-bg-danger">
+                                                    Out Of Stock
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge text-bg-success">
+                                                    In Stock
+                                                </span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">
+                            No fabrics linked to this article.
+                        </p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Quality and Packing size breakdown -->
+        @if (a.SizeBreakdowns.Any() || a.BGradeQuantity.HasValue)
+        {
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header">
+                        Quality &amp; Packing Size Breakdown
+                    </div>
+
+                    <div class="card-body table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Size</th>
+                                    <th>A-Grade Quantity</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @foreach (var size in a.SizeBreakdowns
+                                    .OrderBy(x => x.OrderIndex))
+                                {
+                                    <tr>
+                                        <td>@size.SizeLabel</td>
+                                        <td>@size.Quantity</td>
+                                    </tr>
+                                }
+                            </tbody>
+
+                            <tfoot>
+                                <tr>
+                                    <th>Total A-Grade</th>
+                                    <th>@aGradeTotal</th>
+                                </tr>
+
+                                <tr>
+                                    <th>B-Grade</th>
+                                    <th>@bGradeTotal</th>
+                                </tr>
+
+                                <tr class="table-primary">
+                                    <th>Total Output</th>
+                                    <th>@totalQualityOutput</th>
+                                </tr>
+
+                                <tr class="table-warning">
+                                    <th>Quality &amp; Packing Loss</th>
+                                    <th>@qualityLoss</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Department workflow -->
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    Department Flow &amp; Status
+                </div>
+
+                <div class="card-body table-responsive">
+                    @if (Model.DepartmentStatuses.Any())
+                    {
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Seq</th>
+                                    <th>Department</th>
+                                    <th>Status</th>
+                                    <th>Start</th>
+                                    <th>End</th>
+                                    <th>Duration</th>
+                                    <th>Input</th>
+                                    <th>Output</th>
+                                    <th>Loss</th>
+                                    <th>Note</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @foreach (var d in Model.DepartmentStatuses)
+                                {
+                                    var badge = d.Status switch
+                                    {
+                                        "Done" => "text-bg-success",
+                                        "InProcess" => "text-bg-warning",
+                                        _ => "text-bg-secondary"
+                                    };
+
+                                    <tr>
+                                        <td>
+                                            <span class="badge text-bg-dark">
+                                                @d.SequenceNumber
+                                            </span>
+                                        </td>
+
+                                        <td class="fw-semibold">
+                                            @if (string.Equals(
+                                                d.DepartmentName,
+                                                "Stitching",
+                                                StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <div>
+                                                    Stitching
+                                                </div>
+
+                                                @if (!string.IsNullOrWhiteSpace(
+                                                    a.AssignedTeamName))
+                                                {
+                                                    <div class="small text-primary">
+                                                        <span class="bi bi-people me-1"></span>
+                                                        @a.AssignedTeamName
+                                                    </div>
+                                                }
+
+                                                @if (d.Status == "Done" &&
+                                                    !string.IsNullOrWhiteSpace(
+                                                        a.StitchedBy))
+                                                {
+                                                    <div class="small text-success">
+                                                        <span class="bi bi-person-check me-1"></span>
+                                                        Done by: @a.StitchedBy
+                                                    </div>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                @d.DepartmentName
+                                            }
+                                        </td>
+
+                                        <td>
+                                            <span class="badge @badge">
+                                                @d.Status
+                                            </span>
+                                        </td>
+
+                                        <td>
+                                            @(d.StartedAt?.ToString(
+                                                "dd MMM yyyy HH:mm") ?? "—")
+                                        </td>
+
+                                        <td>
+                                            @(d.EndedAt?.ToString(
+                                                "dd MMM yyyy HH:mm") ?? "—")
+                                        </td>
+
+                                        <td>
+                                            @(d.DurationDisplay ?? "—")
+                                        </td>
+
+                                        <td>
+                                            @(d.InputQuantity?.ToString() ?? "—")
+                                        </td>
+
+                                        <td>
+                                            @(d.OutputQuantity?.ToString() ?? "—")
+                                        </td>
+
+                                        <td>
+    @if (string.Equals(
+        d.DepartmentName,
+        "Delivery",
+        StringComparison.OrdinalIgnoreCase))
+    {
+        <span class="badge text-bg-danger">
+            @totalLoss pieces
+        </span>
+
+        <div class="small text-muted">
+            Total Article Loss
+        </div>
+    }
+    else
+    {
+        @(d.LossQuantity?.ToString() ?? "—")
+    }
+</td>
+
+                                        <td>
+                                            @(d.Note ?? "—")
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">
+                            No department workflow defined for this article.
+                        </p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Undo One Step confirmation modal -->
+<div class="modal fade"
+     id="undoLastStepModal"
+     tabindex="-1"
+     aria-hidden="true">
+
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post"
+                  asp-page-handler="UndoLast"
+                  asp-route-id="@a.Id">
+
+                @Html.AntiForgeryToken()
+
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        Confirm Undo
+                    </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Close">
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <p class="mb-0">
+                        Are you sure you want to undo the last step?
+                    </p>
+
+                    <p class="text-muted small mt-2 mb-0">
+                        This will move the current department one step back.
+                    </p>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal">
+                        Cancel
+                    </button>
+
+                    <button type="submit"
+                            class="btn btn-warning">
+                        <span class="bi bi-arrow-counterclockwise me-1"></span>
+                        Yes, Undo
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

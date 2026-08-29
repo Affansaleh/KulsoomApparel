@@ -1,0 +1,374 @@
+﻿@page
+@model DashboardModel
+@{
+    ViewData["Title"] = "Admin Dashboard";
+}
+
+@await Html.PartialAsync("_Navbar")
+@Html.AntiForgeryToken()
+
+<div class="container-fluid px-4">
+
+    <!-- Stat cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card stat-card shadow-sm h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon bg-primary text-white me-3"><span class="bi bi-box-seam"></span></div>
+                    <div>
+                        <div class="text-muted small">Active Articles</div>
+                        <div class="fs-3 fw-bold">@Model.ActiveArticles</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card shadow-sm h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon bg-success text-white me-3"><span class="bi bi-people"></span></div>
+                    <div>
+                        <div class="text-muted small">Managers</div>
+                        <div class="fs-3 fw-bold">@Model.ManagerCount</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card shadow-sm h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon bg-info text-white me-3"><span class="bi bi-person-badge"></span></div>
+                    <div>
+                        <div class="text-muted small">Readers</div>
+                        <div class="fs-3 fw-bold">@Model.ReaderCount</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                <a href="/Admin/ArticleForm" class="btn btn-primary">
+                    <span class="bi bi-plus-lg me-1"></span>New Article
+                </a>
+            </div>
+
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small text-muted mb-1">Search</label>
+                    <input type="text" class="form-control" id="txtSearch" placeholder="Company / code / colour" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-muted mb-1">Season</label>
+                    <select class="form-select" id="selSeason">
+                        <option value="All">All</option>
+                        <option>Summer</option>
+                        <option>Winter</option>
+                        <option>Spring</option>
+                        <option>Autumn</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-muted mb-1">Status</label>
+                    <select class="form-select" id="selStatus">
+                        <option value="all">All</option>
+                        <option value="overdue">Overdue</option>
+                        <option value="dueSoon">Due Soon</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-muted mb-1">Sort by Days Left</label>
+                    <select class="form-select" id="selSort">
+                        <option value="none">None</option>
+                        <option value="low">Low → High</option>
+                        <option value="high">High → Low</option>
+                    </select>
+                </div>
+                <div class="col-md-1 d-grid">
+                    <button class="btn btn-outline-secondary" id="btnReset">Reset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Articles table -->
+    <div class="card shadow-sm">
+        <div class="card-body table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width:40px;"></th>
+                        <th>Company</th>
+                        <th>Article Code</th>
+                        <th>Colour</th>
+                        <th>Fabric(s)</th>
+                        <th>Qty</th>
+                        <th>Progress</th>
+                        <th>Delivery</th>
+                        <th>Days Left</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="articlesBody">
+                    <tr><td colspan="10" class="text-center text-muted py-4">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Fabric details modal -->
+<div class="modal fade" id="fabricModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Fabric Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-1 small text-muted" id="fabricCounter"></div>
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr><th style="width:45%;">Fabric Code</th><td id="fbCode">—</td></tr>
+                        <tr><th>Invoice #</th><td id="fbInv">—</td></tr>
+                        <tr><th>Fabric Type</th><td id="fbType">—</td></tr>
+                        <tr><th>Used Qty</th><td id="fbQty">—</td></tr>
+                        <tr><th>Status</th><td id="fbStatus">—</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer justify-content-between">
+                <button class="btn btn-outline-secondary" id="fbPrev"><span class="bi bi-chevron-left"></span> Prev</button>
+                <button class="btn btn-outline-secondary" id="fbNext">Next <span class="bi bi-chevron-right"></span></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    (function () {
+        const tbody = document.getElementById('articlesBody');
+        const apiBase = '@Url.Page("Dashboard", "ArticlesLive")';
+        const pinBase = '@Url.Page("Dashboard", "TogglePin")';
+
+        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+
+        let allFabrics = [];  // fabrics of the article whose modal is open
+        let fabricIndex = 0;
+
+        // ---- Fetch + render ----
+        async function load() {
+            const q = document.getElementById('txtSearch').value.trim();
+            const season = document.getElementById('selSeason').value;
+            const status = document.getElementById('selStatus').value;
+            const sort = document.getElementById('selSort').value;
+
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">Loading…</td></tr>';
+
+            const url = apiBase
+                + '&search=' + encodeURIComponent(q)
+                + '&season=' + encodeURIComponent(season)
+                + '&status=' + encodeURIComponent(status)
+                + '&sort=' + encodeURIComponent(sort);
+
+            const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const rows = await res.json();
+            render(rows);
+        }
+
+        function render(rows) {
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">No articles found.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = rows.map(r => {
+                const rowCls = [];
+                if (r.isOverdue) rowCls.push('row-overdue');
+                else if (r.isDueSoon) rowCls.push('row-due-soon');
+                if (r.isPinned) rowCls.push('row-pinned');
+
+                const dayBadge = r.isDelivered
+                    ? '<span class="badge text-bg-secondary">Delivered</span>'
+                    : r.isOverdue
+                        ? `<span class="badge text-bg-danger">Overdue by ${Math.abs(r.daysLeft)}d</span>`
+                        : (r.isDueSoon
+                            ? `<span class="badge text-bg-warning text-dark">${r.daysLeft}d left</span>`
+                            : `<span class="badge text-bg-light text-dark border">${r.daysLeft}d</span>`);
+
+                const fabricCell = renderFabrics(r);
+
+                return `<tr class="${rowCls.join(' ')}" data-id="${r.id}">
+                    <td>
+                        <button class="btn btn-sm btn-link pin-btn ${r.isPinned ? 'text-warning' : 'text-muted'}"
+                                data-id="${r.id}" title="${r.isPinned ? 'Unpin' : 'Pin'}">
+                            <span class="bi ${r.isPinned ? 'bi-pin-fill' : 'bi-pin'}"></span>
+                        </button>
+                    </td>
+                    <td>${esc(r.companyName)}</td>
+                    <td>
+                        <span class="fw-semibold">${esc(r.articleCode)}</span>
+                        ${renderAltCodes(r)}
+                    </td>
+                    <td>${esc(r.color)}</td>
+                    <td>${fabricCell}</td>
+                    <td>${r.quantity ?? 0}</td>
+                    <td style="min-width:130px;">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="badge text-bg-info">${r.doneDepartments}/${r.totalDepartments}</span>
+                        </div>
+                        <div class="progress" style="height:6px;">
+                            <div class="progress-bar" role="progressbar" style="width:${progressPct(r)}%;" aria-valuenow="${progressPct(r)}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </td>
+                    <td>${formatDate(r.deliveryDate)}</td>
+                    <td>${dayBadge}</td>
+                    <td class="text-nowrap">
+                        <a class="btn btn-sm btn-outline-primary" href="/Admin/ArticleDetail/${r.id}">View</a>
+                        <a class="btn btn-sm btn-outline-secondary" href="/Admin/ArticleEdit/${r.id}">Edit</a>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            // bind pin
+            tbody.querySelectorAll('.pin-btn').forEach(btn => {
+                btn.addEventListener('click', () => togglePin(Number(btn.dataset.id)));
+            });
+
+            // bind fabric click
+            tbody.querySelectorAll('.fabric-link').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    openFabrics(Number(el.dataset.id));
+                });
+            });
+        }
+
+        function renderAltCodes(r) {
+            const alts = r.alternateCodes || [];
+            if (!alts.length) return '';
+            return alts.map(c => ` <span class="badge text-bg-secondary" title="Alternate code">${esc(c)}</span>`).join('');
+        }
+
+        function renderFabrics(r) {
+            const list = r.fabrics || [];
+            if (!list.length) return '<span class="text-muted">—</span>';
+            const first = esc(list[0].fabricCode) || '—';
+            const extra = list.length > 1 ? ` <span class="badge text-bg-secondary">+${list.length - 1}</span>` : '';
+            return `<a href="#" class="fabric-link text-decoration-none" data-id="${r.id}">${first}${extra}</a>`;
+        }
+
+        async function togglePin(id) {
+            const form = new URLSearchParams();
+            form.append('id', id);
+
+            const res = await fetch(pinBase, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'RequestVerificationToken': token
+                },
+                body: form.toString()
+            });
+            const data = await res.json();
+            if (!data.success) {
+                showToast(data.message || 'Could not update pin.', 'error');
+            }
+            load();  // refresh to reflect new pin state + counts
+        }
+
+        // ---- Fabric modal ----
+        function openFabrics(articleId) {
+            // find article in latest dataset by re-fetching from current table rows
+            // Simpler: locate the row's data via the rendered DOM is lossy, so re-run live query.
+            // We store the current full rows in a closure.
+            const row = currentRows.find(r => r.id === articleId);
+            if (!row || !(row.fabrics || []).length) return;
+            allFabrics = row.fabrics;
+            fabricIndex = 0;
+            showFabric();
+            const modal = new bootstrap.Modal(document.getElementById('fabricModal'));
+            modal.show();
+        }
+
+        function showFabric() {
+            const f = allFabrics[fabricIndex];
+            document.getElementById('fabricCounter').textContent =
+                `Fabric ${fabricIndex + 1} of ${allFabrics.length}`;
+            document.getElementById('fbCode').textContent = f.fabricCode || '—';
+            document.getElementById('fbInv').textContent = f.invNum || '—';
+            document.getElementById('fbType').textContent = f.fabricType || '—';
+            document.getElementById('fbQty').textContent = f.quantityUsed;
+            const st = f.status === 'OutOfStock'
+                ? '<span class="badge text-bg-danger">Out Of Stock</span>'
+                : '<span class="badge text-bg-success">In Stock</span>';
+            document.getElementById('fbStatus').innerHTML = st;
+
+            const single = allFabrics.length <= 1;
+            document.getElementById('fbPrev').disabled = single;
+            document.getElementById('fbNext').disabled = single;
+        }
+
+        document.getElementById('fbPrev').addEventListener('click', () => {
+            if (fabricIndex > 0) { fabricIndex--; showFabric(); }
+        });
+        document.getElementById('fbNext').addEventListener('click', () => {
+            if (fabricIndex < allFabrics.length - 1) { fabricIndex++; showFabric(); }
+        });
+
+        // ---- Utilities ----
+        let currentRows = [];
+
+        function progressPct(r) {
+            if (!r.totalDepartments) return 0;
+            return Math.round((r.doneDepartments / r.totalDepartments) * 100);
+        }
+
+        function esc(s) {
+            if (!s) return '—';
+            const d = document.createElement('div');
+            d.textContent = String(s);
+            return d.innerHTML;
+        }
+
+        function formatDate(iso) {
+            if (!iso) return '—';
+            const d = new Date(iso);
+            return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        // ---- Events ----
+        // debounced search
+        let debounce;
+        document.getElementById('txtSearch').addEventListener('input', () => {
+            clearTimeout(debounce);
+            debounce = setTimeout(load, 350);
+        });
+
+        document.getElementById('selSeason').addEventListener('change', load);
+        document.getElementById('selStatus').addEventListener('change', load);
+        document.getElementById('selSort').addEventListener('change', load);
+
+        document.getElementById('btnReset').addEventListener('click', () => {
+            document.getElementById('txtSearch').value = '';
+            document.getElementById('selSeason').value = 'All';
+            document.getElementById('selStatus').value = 'all';
+            document.getElementById('selSort').value = 'none';
+            load();
+        });
+
+        // override: capture currentRows on each render
+        const origRender = render;
+        render = function (rows) {
+            currentRows = rows;
+            origRender(rows);
+        };
+
+        load();
+    })();
+</script>
+}
