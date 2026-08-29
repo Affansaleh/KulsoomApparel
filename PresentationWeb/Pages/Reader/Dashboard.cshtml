@@ -1,0 +1,199 @@
+﻿@page "/Reader/Dashboard"
+@model DashboardModel
+@{
+    ViewData["Title"] = "Reader Dashboard";
+}
+
+@await Html.PartialAsync("_Navbar")
+@Html.AntiForgeryToken()
+
+<div class="container-fluid px-4">
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card stat-card shadow-sm h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon bg-primary text-white me-3"><span class="bi bi-box-seam"></span></div>
+                    <div>
+                        <div class="text-muted small">Active Articles</div>
+                        <div class="fs-3 fw-bold">@Model.ActiveArticles</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small text-muted mb-1">Search</label>
+                    <input type="text" class="form-control" id="txtSearch" placeholder="Company / code / colour" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-muted mb-1">Season</label>
+                    <select class="form-select" id="selSeason">
+                        <option value="All">All</option>
+                        <option>Summer</option>
+                        <option>Winter</option>
+                        <option>Spring</option>
+                        <option>Autumn</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-muted mb-1">Status</label>
+                    <select class="form-select" id="selStatus">
+                        <option value="all">All</option>
+                        <option value="active">Active</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="overdue">Overdue</option>
+                        <option value="dueSoon">Due Soon</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-muted mb-1">Sort by Days Left</label>
+                    <select class="form-select" id="selSort">
+                        <option value="none">None</option>
+                        <option value="low">Low → High</option>
+                        <option value="high">High → Low</option>
+                    </select>
+                </div>
+                <div class="col-md-1 d-grid">
+                    <button class="btn btn-outline-secondary" id="btnReset">Reset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="card shadow-sm">
+        <div class="card-body table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Company</th>
+                        <th>Article Code</th>
+                        <th>Colour</th>
+                        <th>Fabric(s)</th>
+                        <th>Qty</th>
+                        <th>Progress</th>
+                        <th>Delivery</th>
+                        <th>Days Left</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="articlesBody">
+                    <tr><td colspan="9" class="text-center text-muted py-4">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function() {
+            const tbody = document.getElementById('articlesBody');
+            const apiBase = '@Url.Page("Dashboard", "ArticlesLive")';
+
+            async function load() {
+                const q = document.getElementById('txtSearch').value.trim();
+                const season = document.getElementById('selSeason').value;
+                const status = document.getElementById('selStatus').value;
+                const sort = document.getElementById('selSort').value;
+
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">Loading…</td></tr>';
+
+                const url = apiBase
+                    + '&search=' + encodeURIComponent(q)
+                    + '&season=' + encodeURIComponent(season)
+                    + '&status=' + encodeURIComponent(status)
+                    + '&sort=' + encodeURIComponent(sort);
+                const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                const rows = await res.json();
+                render(rows);
+            }
+
+            function render(rows) {
+                if (!rows.length) {
+                    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No articles found.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = rows.map(r => {
+                    const rowCls = [];
+                    if (r.isOverdue) rowCls.push('row-overdue');
+                    else if (r.isDueSoon) rowCls.push('row-due-soon');
+
+                    const dayBadge = r.isDelivered
+                        ? '<span class="badge text-bg-secondary">Delivered</span>'
+                        : r.isOverdue
+                            ? `<span class="badge text-bg-danger">Overdue by ${Math.abs(r.daysLeft)}d</span>`
+                            : (r.isDueSoon
+                                ? `<span class="badge text-bg-warning text-dark">${r.daysLeft}d left</span>`
+                                : `<span class="badge text-bg-light text-dark border">${r.daysLeft}d</span>`);
+
+                    const fabrics = r.fabrics || [];
+                    const fabricCell = fabrics.length ? fabrics.map(f => esc(f.fabricCode)).join(', ') : '—';
+
+                    return `<tr class="${rowCls.join(' ')}">
+                            <td>${esc(r.companyName)}</td>
+                            <td>
+                                <span class="fw-semibold">${esc(r.articleCode)}</span>
+                                ${(r.alternateCodes || []).map(c => ` <span class="badge text-bg-secondary" title="Alternate code">${esc(c)}</span>`).join('')}
+                            </td>
+                            <td>${esc(r.color)}</td>
+                            <td>${fabricCell}</td>
+                            <td>${r.quantity}</td>
+                            <td style="min-width:130px;">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <span class="badge text-bg-info">${r.doneDepartments}/${r.totalDepartments}</span>
+                                </div>
+                                <div class="progress" style="height:6px;">
+                                    <div class="progress-bar" role="progressbar" style="width:${progressPct(r)}%;" aria-valuenow="${progressPct(r)}" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                            </td>
+                            <td>${formatDate(r.deliveryDate)}</td>
+                            <td>${dayBadge}</td>
+                            <td><a class="btn btn-sm btn-outline-primary" href="/Reader/ArticleDetail/${r.id}">View</a></td>
+                        </tr>`;
+                }).join('');
+            }
+
+            let debounce;
+            document.getElementById('txtSearch').addEventListener('input', () => {
+                clearTimeout(debounce);
+                debounce = setTimeout(load, 350);
+            });
+            document.getElementById('selSeason').addEventListener('change', load);
+            document.getElementById('selStatus').addEventListener('change', load);
+            document.getElementById('selSort').addEventListener('change', load);
+            document.getElementById('btnReset').addEventListener('click', () => {
+                document.getElementById('txtSearch').value = '';
+                document.getElementById('selSeason').value = 'All';
+                document.getElementById('selStatus').value = 'all';
+                document.getElementById('selSort').value = 'none';
+                load();
+            });
+
+            function progressPct(r) {
+                if (!r.totalDepartments) return 0;
+                return Math.round((r.doneDepartments / r.totalDepartments) * 100);
+            }
+
+            function esc(s) {
+                if (!s) return '—';
+                const d = document.createElement('div');
+                d.textContent = String(s);
+                return d.innerHTML;
+            }
+            function formatDate(iso) {
+                if (!iso) return '—';
+                const d = new Date(iso);
+                return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+            }
+
+            load();
+        })();
+    </script>
+}

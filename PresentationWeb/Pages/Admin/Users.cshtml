@@ -1,0 +1,233 @@
+﻿@page "/Admin/Users"
+@model UsersModel
+@{
+    ViewData["Title"] = "Users";
+}
+
+@await Html.PartialAsync("_Navbar")
+
+<div class="container-fluid px-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h4 class="mb-0">Users</h4>
+        <a asp-page="/Admin/Dashboard" class="btn btn-outline-secondary btn-sm"><span class="bi bi-arrow-left"></span> Back to Dashboard</a>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success py-2">@TempData["SuccessMessage"]</div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger py-2">@TempData["ErrorMessage"]</div>
+    }
+
+    <div class="card shadow-sm">
+        <div class="card-body table-responsive">
+            @if (Model.Users.Any())
+            {
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Role</th>
+                            <th>Department</th>
+                            <th>Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var u in Model.Users)
+                        {
+                            var roleBadge = u.Role == "Manager" ? "text-bg-info" : (u.Role == "Reader" ? "text-bg-secondary" : "text-bg-primary");
+                            <tr data-username="@u.Username" data-role="@u.Role" data-dept="@(u.DepartmentId?.ToString() ?? "")">
+                                <td class="fw-semibold">@u.Username</td>
+                                <td><span class="badge @roleBadge">@u.Role</span></td>
+                                <td>@(u.DepartmentName ?? "—")</td>
+                                <td>
+                                    @if (u.IsActive)
+                                    {
+                                        <span class="badge text-bg-success">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge text-bg-danger">Inactive</span>
+                                    }
+                                </td>
+                                <td class="text-end text-nowrap">
+                                    <button type="button" class="btn btn-sm btn-outline-primary btn-edit-user"
+                                            data-id="@u.Id" data-username="@u.Username" data-dept="@(u.DepartmentId?.ToString() ?? "")">
+                                        <span class="bi bi-pencil"></span> Edit
+                                    </button>
+                                    @if (u.Role != "Admin")
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-secondary btn-reset-pwd"
+                                                data-id="@u.Id" data-username="@u.Username">
+                                            <span class="bi bi-key"></span> Password
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <p class="text-muted mb-0">No users found.</p>
+            }
+        </div>
+    </div>
+</div>
+<!-- Stitching Team Names -->
+<div class="card shadow-sm mt-4">
+    <div class="card-header">
+        <span class="bi bi-people me-1"></span>
+        Stitching Team Names
+    </div>
+
+    <div class="card-body">
+        @if (Model.TeamA != null && Model.TeamB != null)
+        {
+            <form method="post" asp-page-handler="UpdateTeams">
+                @Html.AntiForgeryToken()
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="teamAName" class="form-label">
+                            Team A Name
+                        </label>
+
+                        <input type="hidden"
+                               name="teamAId"
+                               value="@Model.TeamA.Id" />
+
+                        <input type="text"
+                               id="teamAName"
+                               name="teamAName"
+                               class="form-control"
+                               value="@Model.TeamA.Name"
+                               maxlength="50"
+                               required />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label for="teamBName" class="form-label">
+                            Team B Name
+                        </label>
+
+                        <input type="hidden"
+                               name="teamBId"
+                               value="@Model.TeamB.Id" />
+
+                        <input type="text"
+                               id="teamBName"
+                               name="teamBName"
+                               class="form-control"
+                               value="@Model.TeamB.Name"
+                               maxlength="50"
+                               required />
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-primary">
+                        <span class="bi bi-check-lg me-1"></span>
+                        Save Team Names
+                    </button>
+                </div>
+            </form>
+        }
+        else
+        {
+            <div class="alert alert-warning mb-0">
+                Stitching Team A and Team B are not configured yet.
+            </div>
+        }
+    </div>
+</div>
+<!-- Edit User modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" asp-page-handler="UpdateUser">
+                <input type="hidden" id="editUserId" name="id" />
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit User</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="form-control" id="editUsername" name="newUsername" required minlength="3" maxlength="50" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Department</label>
+                        <select class="form-select" id="editDepartment" name="newDepartmentId">
+                            <option value="">— None —</option>
+                            @foreach (var d in Model.Departments)
+                            {
+                                <option value="@d.Id">@d.Name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Reset Password modal -->
+<div class="modal fade" id="resetPwdModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" asp-page-handler="ResetPassword">
+                <input type="hidden" id="resetUserId" name="id" />
+                <div class="modal-header">
+                    <h5 class="modal-title">Reset Password — <span id="resetUsername"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">New Password</label>
+                        <input type="password" class="form-control" name="newPassword" required minlength="4" autocomplete="new-password" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Reset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function() {
+            // Edit user
+            document.querySelectorAll('.btn-edit-user').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    document.getElementById('editUserId').value = btn.getAttribute('data-id');
+                    document.getElementById('editUsername').value = btn.getAttribute('data-username');
+                    document.getElementById('editDepartment').value = btn.getAttribute('data-dept') || '';
+                    new bootstrap.Modal(document.getElementById('editUserModal')).show();
+                });
+            });
+
+            // Reset password
+            document.querySelectorAll('.btn-reset-pwd').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    document.getElementById('resetUserId').value = btn.getAttribute('data-id');
+                    document.getElementById('resetUsername').textContent = btn.getAttribute('data-username');
+                    const pwdInput = document.querySelector('#resetPwdModal input[name="newPassword"]');
+                    pwdInput.value = '';
+                    new bootstrap.Modal(document.getElementById('resetPwdModal')).show();
+                });
+            });
+        })();
+    </script>
+}

@@ -1,0 +1,348 @@
+﻿/* ============================================================
+   Kulsoom Apparel — Premium UI Theme
+   Navy + gold executive palette, light/dark via data-bs-theme.
+   Buttons keep their existing shape (border-radius untouched).
+   Paste contents into site.css OR link premium.css after site.css.
+   ============================================================ */
+
+:root,
+[data-bs-theme="light"] {
+    --ka-bg: #F8FAFC;
+    --ka-card: #FFFFFF;
+    --ka-text: #0A2540;
+    --ka-muted: #64748B;
+    --ka-border: #E2E8F0;
+    --ka-primary: #0A2540;
+    --ka-primary-text: #FFFFFF;
+    --ka-gold: #C5A059;
+    --ka-shadow: 0 4px 18px rgba(10, 37, 64, 0.06);
+    --ka-chip: #F1F5F9;
+    --ka-hover: #F1F5F9;
+    --ka-row-overdue: #FEF2F2;
+    --ka-row-due: #FFFBEB;
+    --ka-badge-info-bg: #EFF6FF;
+    --ka-badge-info-text: #1D4ED8;
+    --ka-badge-success-bg: #ECFDF5;
+    --ka-badge-success-text: #047857;
+    --ka-badge-warn-bg: #FFFBEB;
+    --ka-badge-warn-text: #B45309;
+    --ka-badge-danger-bg: #FEF2F2;
+    --ka-badge-danger-text: #DC2626;
+    --ka-body-bg: #F8FAFC;
+    --ka-card-bg: #FFFFFF;
+    --ka-input-bg: #FFFFFF;
+}
+
+[data-bs-theme="dark"] {
+    --ka-bg: #0F172A;
+    --ka-card: #1E293B;
+    --ka-text: #F8FAFC;
+    --ka-muted: #94A3B8;
+    --ka-border: #334155;
+    --ka-primary: #C5A059;
+    --ka-primary-text: #0A2540;
+    --ka-gold: #C5A059;
+    --ka-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+    --ka-chip: #24324A;
+    --ka-hover: #26344D;
+    --ka-row-overdue: rgba(239, 68, 68, 0.12);
+    --ka-row-due: rgba(245, 158, 11, 0.12);
+    --ka-badge-info-bg: rgba(59, 130, 246, 0.18);
+    --ka-badge-info-text: #93C5FD;
+    --ka-badge-success-bg: rgba(16, 185, 129, 0.16);
+    --ka-badge-success-text: #6EE7B7;
+    --ka-badge-warn-bg: rgba(245, 158, 11, 0.16);
+    --ka-badge-warn-text: #FCD34D;
+    --ka-badge-danger-bg: rgba(239, 68, 68, 0.16);
+    --ka-badge-danger-text: #FCA5A5;
+    --ka-body-bg: #0F172A;
+    --ka-card-bg: #1E293B;
+    --ka-input-bg: #1E293B;
+}
+
+/* ---- Global surface ---- */
+body {
+    background-color: var(--ka-bg);
+    color: var(--ka-text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Plus Jakarta Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Brand logo ---- */
+.brand-logo {
+    height: 38px;
+    width: auto;
+    border-radius: 8px;
+}
+
+/* ---- Navbar ---- */
+.navbar {
+    background-color: var(--ka-card) !important;
+    border-bottom: 1px solid var(--ka-border) !important;
+    box-shadow: var(--ka-shadow);
+}
+
+    .navbar .nav-link {
+        color: var(--ka-muted) !important;
+        font-weight: 500;
+    }
+
+        .navbar .nav-link:hover,
+        .navbar .nav-link.active {
+            color: var(--ka-text) !important;
+            background: var(--ka-chip);
+            border-radius: 8px;
+        }
+
+    .navbar .navbar-brand {
+        color: var(--ka-text) !important;
+        font-weight: 700;
+    }
+
+    .navbar .text-muted {
+        color: var(--ka-muted) !important;
+    }
+
+/* ---- Cards / panels ---- */
+.card,
+.stat-card,
+.panel {
+    background-color: var(--ka-card) !important;
+    border: 1px solid var(--ka-border) !important;
+    border-radius: 12px !important;
+    box-shadow: var(--ka-shadow);
+}
+
+.card-header {
+    background-color: transparent !important;
+    border-bottom: 1px solid var(--ka-border) !important;
+    font-weight: 700;
+    color: var(--ka-text);
+}
+
+/* ---- Buttons: keep shape, apply palette ---- */
+.btn-primary {
+    background-color: var(--ka-primary) !important;
+    border-color: var(--ka-primary) !important;
+    color: var(--ka-primary-text) !important;
+    box-shadow: var(--ka-shadow);
+}
+
+    .btn-primary:hover {
+        opacity: 0.92;
+        filter: brightness(1.04);
+    }
+
+/* ---- Stat cards (dashboard) ---- */
+.stat-card .fs-3 {
+    color: var(--ka-text);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
+.stat-card .text-muted {
+    color: var(--ka-muted) !important;
+}
+
+.stat-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-size: 20px;
+}
+
+/* ---- Tables ---- */
+.table {
+    color: var(--ka-text);
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--ka-text);
+}
+
+    .table thead th {
+        color: var(--ka-muted);
+        font-weight: 600;
+        font-size: 11.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid var(--ka-border);
+    }
+
+    .table td {
+        border-bottom: 1px solid var(--ka-border);
+        padding: 14px 16px;
+        vertical-align: middle;
+    }
+
+    .table tbody tr {
+        background-color: var(--ka-card);
+    }
+
+        .table tbody tr:hover {
+            background-color: var(--ka-hover) !important;
+        }
+
+    .table .fw-semibold,
+    .table .code {
+        color: var(--ka-text);
+        font-weight: 700;
+    }
+
+    /* ---- Row highlighting ---- */
+    .table tbody tr.row-overdue {
+        background-color: var(--ka-row-overdue) !important;
+    }
+
+    .table tbody tr.row-due-soon,
+    .table tbody tr.row-due {
+        background-color: var(--ka-row-due) !important;
+    }
+
+    .table tbody tr.row-pinned {
+        border-left: 4px solid var(--ka-gold);
+    }
+
+/* ---- Badges ---- */
+.badge.text-bg-info {
+    background-color: var(--ka-badge-info-bg) !important;
+    color: var(--ka-badge-info-text) !important;
+    border-radius: 6px;
+}
+
+.badge.text-bg-success {
+    background-color: var(--ka-badge-success-bg) !important;
+    color: var(--ka-badge-success-text) !important;
+    border-radius: 6px;
+}
+
+.badge.text-bg-warning {
+    background-color: var(--ka-badge-warn-bg) !important;
+    color: var(--ka-badge-warn-text) !important;
+    border-radius: 6px;
+}
+
+.badge.text-bg-danger {
+    background-color: var(--ka-badge-danger-bg) !important;
+    color: var(--ka-badge-danger-text) !important;
+    border-radius: 6px;
+}
+
+.badge.text-bg-secondary {
+    background-color: var(--ka-chip) !important;
+    color: var(--ka-muted) !important;
+    border-radius: 6px;
+}
+
+/* ---- Forms ---- */
+.form-control,
+.form-select {
+    background-color: var(--ka-input-bg);
+    color: var(--ka-text);
+    border: 1px solid var(--ka-border);
+    border-radius: 8px;
+}
+
+    .form-control:focus,
+    .form-select:focus {
+        border-color: var(--ka-primary);
+        box-shadow: none;
+    }
+
+.form-label {
+    color: var(--ka-muted);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* ---- Progress bar (production progress) ---- */
+.progress {
+    background-color: var(--ka-chip);
+    border-radius: 8px;
+    height: 20px;
+}
+
+.progress-bar {
+    background-color: var(--ka-gold);
+    color: var(--ka-text);
+    font-weight: 700;
+    border-radius: 8px;
+}
+
+.progress-text {
+    font-weight: 800;
+    color: var(--ka-text);
+}
+
+/* ---- Alerts ---- */
+.alert-success {
+    background: var(--ka-badge-success-bg);
+    color: var(--ka-badge-success-text);
+    border: none;
+    border-radius: 10px;
+}
+
+.alert-danger {
+    background: var(--ka-badge-danger-bg);
+    color: var(--ka-badge-danger-text);
+    border: none;
+    border-radius: 10px;
+}
+
+.alert-warning {
+    background: var(--ka-badge-warn-bg);
+    color: var(--ka-badge-warn-text);
+    border: none;
+    border-radius: 10px;
+}
+
+.alert-info {
+    background: var(--ka-badge-info-bg);
+    color: var(--ka-badge-info-text);
+    border: none;
+    border-radius: 10px;
+}
+
+/* ---- Misc ---- */
+.text-muted {
+    color: var(--ka-muted) !important;
+}
+
+hr {
+    border-color: var(--ka-border);
+}
+
+.list-group-item {
+    background-color: var(--ka-card);
+    color: var(--ka-text);
+    border-color: var(--ka-border);
+}
+
+    .list-group-item.active {
+        background-color: var(--ka-primary);
+        border-color: var(--ka-primary);
+        color: var(--ka-primary-text);
+    }
+
+.modal-content {
+    background-color: var(--ka-card);
+    color: var(--ka-text);
+    border: 1px solid var(--ka-border);
+    border-radius: 14px;
+}
+
+.dropdown-menu {
+    background-color: var(--ka-card);
+    color: var(--ka-text);
+    border: 1px solid var(--ka-border);
+}
+
+.dropdown-item {
+    color: var(--ka-text);
+}
+
+    .dropdown-item:hover {
+        background-color: var(--ka-hover);
+    }

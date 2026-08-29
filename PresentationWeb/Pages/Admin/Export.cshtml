@@ -1,0 +1,240 @@
+@page "/Admin/Export"
+@model ExportModel
+@{
+    ViewData["Title"] = "Export to Excel";
+}
+
+@await Html.PartialAsync("_Navbar")
+@Html.AntiForgeryToken()
+
+<div class="container-fluid px-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h4 class="mb-0">Export to Excel</h4>
+        <a asp-page="/Admin/Dashboard" class="btn btn-outline-secondary btn-sm"><span class="bi bi-arrow-left"></span> Back to Dashboard</a>
+    </div>
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger py-2">@TempData["ErrorMessage"]</div>
+    }
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">Filter (Order Date)</div>
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <label class="form-label">From Order Date</label>
+                    <input type="date" class="form-control" id="exportFromDate" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Order Date</label>
+                    <input type="date" class="form-control" id="exportToDate" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Search (code / company)</label>
+                    <input type="text" class="form-control" id="exportSearch" placeholder="Search by article code or company..." autocomplete="off" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="button" class="btn btn-outline-secondary w-100" id="btnResetFilter">Reset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">Columns to Export</div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input col-chk" type="checkbox" id="incBasic" checked />
+                        <label class="form-check-label" for="incBasic">Basic Details</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input col-chk" type="checkbox" id="incFabric" checked />
+                        <label class="form-check-label" for="incFabric">Fabric Info</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input col-chk" type="checkbox" id="incPricing" />
+                        <label class="form-check-label" for="incPricing">Pricing</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input col-chk" type="checkbox" id="incDept" />
+                        <label class="form-check-label" for="incDept">Department Working Details</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input col-chk" type="checkbox" id="incSize" />
+                        <label class="form-check-label" for="incSize">Size Breakdown</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Select Articles</span>
+            <div class="form-check form-check-inline mb-0">
+                <input class="form-check-input" type="checkbox" id="selectAll" />
+                <label class="form-check-label" for="selectAll">Select All</label>
+            </div>
+        </div>
+        <div class="card-body table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width:40px;"></th>
+                        <th>Article Code</th>
+                        <th>Company</th>
+                        <th>Order Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="exportBody">
+                    <tr><td colspan="5" class="text-center text-muted py-4">Select a date range to load articles.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer">
+            <button type="button" class="btn btn-primary" id="btnExport">
+                <span class="bi bi-file-earmark-excel"></span> Export Selected
+            </button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const apiBase = '@Url.Page("Export", "Articles")';
+            const generateBase = '@Url.Page("Export", "Generate")';
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+            const tbody = document.getElementById('exportBody');
+            const fromInput = document.getElementById('exportFromDate');
+            const toInput = document.getElementById('exportToDate');
+            const selectAll = document.getElementById('selectAll');
+
+            const searchInput = document.getElementById('exportSearch');
+
+            async function loadArticles() {
+                const from = fromInput.value;
+                const to = toInput.value;
+                const search = searchInput.value.trim();
+
+                const url = apiBase + '&from=' + encodeURIComponent(from)
+                    + '&to=' + encodeURIComponent(to)
+                    + '&search=' + encodeURIComponent(search);
+                const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                const rows = await res.json();
+                render(rows);
+            }
+
+            let debounce;
+            searchInput.addEventListener('input', function () {
+                clearTimeout(debounce);
+                debounce = setTimeout(loadArticles, 350);
+            });
+            document.getElementById('btnResetFilter').addEventListener('click', function () {
+                fromInput.value = '';
+                toInput.value = '';
+                searchInput.value = '';
+                loadArticles();
+            });
+
+            function render(rows) {
+                selectAll.checked = false;
+                if (!rows.length) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No articles in this date range.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = rows.map(r =>
+                    `<tr>
+                        <td><input type="checkbox" class="form-check-input row-chk" data-id="${r.id}" /></td>
+                        <td class="fw-semibold">${esc(r.articleCode)}</td>
+                        <td>${esc(r.companyName)}</td>
+                        <td>${formatDate(r.orderDate)}</td>
+                        <td>${r.status === 'Delivered' ? '<span class="badge text-bg-success">Delivered</span>' : '<span class="badge text-bg-secondary">Active</span>'}</td>
+                    </tr>`).join('');
+            }
+
+            fromInput.addEventListener('change', loadArticles);
+            toInput.addEventListener('change', loadArticles);
+
+            // Select All toggles all visible row checkboxes
+            selectAll.addEventListener('change', function () {
+                tbody.querySelectorAll('.row-chk').forEach(function (chk) {
+                    chk.checked = selectAll.checked;
+                });
+            });
+
+            document.getElementById('btnExport').addEventListener('click', async function () {
+                const ids = [];
+                tbody.querySelectorAll('.row-chk:checked').forEach(function (chk) {
+                    ids.push(chk.getAttribute('data-id'));
+                });
+
+                if (!ids.length) {
+                    alert('Select at least one article to export.');
+                    return;
+                }
+
+                const body = new URLSearchParams();
+                ids.forEach(function (id) { body.append('articleIds', id); });
+                body.append('includeBasic', document.getElementById('incBasic').checked);
+                body.append('includeFabric', document.getElementById('incFabric').checked);
+                body.append('includePricing', document.getElementById('incPricing').checked);
+                body.append('includeDepartments', document.getElementById('incDept').checked);
+                body.append('includeSizeBreakdown', document.getElementById('incSize').checked);
+
+                // File download via POST
+                const res = await fetch(generateBase, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'RequestVerificationToken': token
+                    },
+                    body: body.toString()
+                });
+
+                if (!res.ok) {
+                    alert('Export failed. Please try again.');
+                    return;
+                }
+
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'export.xlsx';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+
+            function esc(s) {
+                if (!s) return '—';
+                const d = document.createElement('div');
+                d.textContent = String(s);
+                return d.innerHTML;
+            }
+
+            function formatDate(iso) {
+                if (!iso) return '—';
+                const d = new Date(iso);
+                return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+            }
+
+            // Load all articles on page load (no filters yet)
+            loadArticles();
+        })();
+    </script>
+}

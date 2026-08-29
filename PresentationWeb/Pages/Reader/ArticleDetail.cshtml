@@ -1,0 +1,147 @@
+﻿@page "/Reader/ArticleDetail/{id:int}"
+@model ArticleDetailModel
+@{
+    ViewData["Title"] = "Article Detail";
+    var a = Model.Article!;
+}
+
+@await Html.PartialAsync("_Navbar")
+
+<div class="container-fluid px-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h4 class="mb-0">Article @a.ArticleCode</h4>
+        <a asp-page="/Reader/Dashboard" class="btn btn-outline-secondary btn-sm"><span class="bi bi-arrow-left"></span> Back to Dashboard</a>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Article Information</span>
+                    <div>
+                        @if (a.IsDelivered) { <span class="badge text-bg-success">Delivered</span> }
+                        @if (a.IsPinned) { <span class="badge text-bg-warning"><span class="bi bi-pin-fill"></span> Pinned</span> }
+                    </div>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                            <tr><th style="width:40%;">Company</th><td>@a.CompanyName</td></tr>
+                            <tr><th>Article Code</th><td>@a.ArticleCode</td></tr>
+                            <tr><th>Colour</th><td>@(a.Color ?? "—")</td></tr>
+                            <tr><th>Order Date</th><td>@a.OrderDate.ToString("dd MMM yyyy")</td></tr>
+                            <tr><th>Delivery Date</th><td>@a.DeliveryDate.ToString("dd MMM yyyy")</td></tr>
+                            <tr><th>Season</th><td>@(a.Season ?? "—")</td></tr>
+                            <tr><th>Quantity</th><td>@a.Quantity</td></tr>
+                            <tr><th>Price / Piece</th><td>@(a.PricePerPiece?.ToString("N2") ?? "—")</td></tr>
+                            <tr><th>Total Price</th><td>@(a.PriceTotal?.ToString("N2") ?? "—")</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">Production Progress</div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="fs-4 fw-bold">@a.DoneDepartments / @a.TotalDepartments</span>
+                        <span class="text-muted small">departments done</span>
+                    </div>
+                    @{
+                        var pct = a.TotalDepartments > 0 ? (int)Math.Round((double)a.DoneDepartments / a.TotalDepartments * 100) : 0;
+                    }
+                    <div class="progress" style="height:20px;">
+                        <div class="progress-bar" role="progressbar" style="width:@(pct)%;" aria-valuenow="@pct" aria-valuemin="0" aria-valuemax="100">@(pct)%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header">Linked Fabrics</div>
+                <div class="card-body table-responsive">
+                    @if (a.Fabrics.Any())
+                    {
+                        <table class="table table-sm align-middle mb-0">
+                            <thead><tr><th>Code</th><th>Type</th><th>Invoice</th><th>Used Qty</th><th>Status</th></tr></thead>
+                            <tbody>
+                                @foreach (var f in a.Fabrics)
+                                {
+                                    <tr>
+                                        <td>@f.FabricCode</td>
+                                        <td>@f.FabricType</td>
+                                        <td>@f.InvNum</td>
+                                        <td>@f.QuantityUsed</td>
+                                        <td>
+                                            @if (f.Status == "OutOfStock")
+                                            {
+                                                <span class="badge text-bg-danger">Out Of Stock</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge text-bg-success">In Stock</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">No fabrics linked to this article.</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header">Department Flow &amp; Status</div>
+                <div class="card-body table-responsive">
+                    @if (Model.DepartmentStatuses.Any())
+                    {
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Seq</th><th>Department</th><th>Status</th><th>Start</th><th>End</th>
+                                    <th>Duration</th><th>Input</th><th>Output</th><th>Loss</th><th>Note</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var d in Model.DepartmentStatuses)
+                                {
+                                    var badge = d.Status switch
+                                    {
+                                        "Done" => "text-bg-success",
+                                        "InProcess" => "text-bg-warning",
+                                        _ => "text-bg-secondary"
+                                    };
+                                    <tr>
+                                        <td><span class="badge text-bg-dark">@d.SequenceNumber</span></td>
+                                        <td class="fw-semibold">@d.DepartmentName</td>
+                                        <td><span class="badge @badge">@d.Status</span></td>
+                                        <td>@(d.StartedAt?.ToString("dd MMM yyyy HH:mm") ?? "—")</td>
+                                        <td>@(d.EndedAt?.ToString("dd MMM yyyy HH:mm") ?? "—")</td>
+                                        <td>@(d.DurationDisplay ?? "—")</td>
+                                        <td>@(d.InputQuantity?.ToString() ?? "—")</td>
+                                        <td>@(d.OutputQuantity?.ToString() ?? "—")</td>
+                                        <td>@(d.LossQuantity?.ToString() ?? "—")</td>
+                                        <td>@(d.Note ?? "—")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">No department workflow defined for this article.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
