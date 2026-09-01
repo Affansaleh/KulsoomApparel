@@ -47,6 +47,35 @@
         </div>
     }
 
+    @if (Model.DepartmentType == Domain.Enums.DepartmentType.Pattern && Model.SamplingApprovals.Any())
+    {
+        <div class="card shadow-sm border-warning mb-3">
+            <div class="card-header bg-warning-subtle fw-semibold">Sampling Approval Requests</div>
+            <div class="card-body table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr><th>Article</th><th>Company</th><th>Attempt</th><th>Submitted</th><th class="text-end">Decision</th></tr></thead>
+                    <tbody>
+                    @foreach (var request in Model.SamplingApprovals)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@request.ArticleCode</td><td>@request.CompanyName</td>
+                            <td>@request.SamplingAttemptCount</td><td>@request.SamplingSubmittedAt?.ToString("dd MMM yyyy HH:mm")</td>
+                            <td class="text-end">
+                                <form method="post" asp-page-handler="ReviewSampling" class="d-inline-flex gap-2 align-items-center">
+                                    <input type="hidden" name="statusId" value="@request.Id" />
+                                    <input type="text" name="note" class="form-control form-control-sm" placeholder="Optional note" />
+                                    <button name="approved" value="true" class="btn btn-sm btn-success">Approve</button>
+                                    <button name="approved" value="false" class="btn btn-sm btn-danger">Reject</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
     <div class="card shadow-sm">
         <div class="card-header">
             Work Queue

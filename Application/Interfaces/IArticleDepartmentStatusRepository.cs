@@ -14,6 +14,7 @@ public interface IArticleDepartmentStatusRepository
     Task<List<ArticleDepartmentStatus>> GetByArticleAsync(int articleId);
     Task<List<ArticleDepartmentStatus>> GetByDepartmentAsync(int departmentId);
     Task<ArticleDepartmentStatus?> GetNextPendingAsync(int articleId, int currentSequenceNumber);
+    Task<List<ArticleDepartmentStatus>> GetSamplingAwaitingApprovalAsync();
     void Update(ArticleDepartmentStatus status);
     Task SaveChangesAsync();
 }

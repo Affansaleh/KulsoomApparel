@@ -10,4 +10,6 @@ public interface IWorkflowService
     Task<List<ArticleDepartmentStatusDto>> GetPendingByDepartmentAsync(int departmentId);
     Task UndoLastDepartmentAsync(int articleId, int updatedByUserId);
     Task UndoDeliverAsync(int articleId, int updatedByUserId);
+    Task<List<ArticleDepartmentStatusDto>> GetSamplingAwaitingApprovalAsync();
+    Task ReviewSamplingAsync(int statusId, bool approved, string? note, int reviewedByUserId);
 }

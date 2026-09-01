@@ -174,6 +174,9 @@ public class ApplicationDbContext : DbContext
              .HasForeignKey(ads => ads.UpdatedByUserId)
              .OnDelete(DeleteBehavior.Restrict);
 
+            e.Property(ads => ads.SamplingApprovalState).HasMaxLength(30);
+            e.Property(ads => ads.SamplingReviewNote).HasMaxLength(1000);
+
             e.HasIndex(ads => new { ads.ArticleId, ads.DepartmentId }).IsUnique();
         });
 

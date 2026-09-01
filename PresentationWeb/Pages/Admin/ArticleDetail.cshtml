@@ -439,6 +439,12 @@
                                             else
                                             {
                                                 @d.DepartmentName
+                                                @if (string.Equals(d.DepartmentName, "Sampling", StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    <div class="small text-primary">Sampling Attempts: @d.SamplingAttemptCount</div>
+                                                    @if (!string.IsNullOrWhiteSpace(d.SamplingApprovalState))
+                                                    { <div class="small text-muted">@d.SamplingApprovalState</div> }
+                                                }
                                             }
                                         </td>
 

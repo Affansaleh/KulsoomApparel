@@ -52,6 +52,17 @@ public class ArticleDepartmentStatusRepository : IArticleDepartmentStatusReposit
             .FirstOrDefaultAsync();
     }
 
+    public async Task<List<ArticleDepartmentStatus>> GetSamplingAwaitingApprovalAsync()
+    {
+        return await _context.ArticleDepartmentStatuses
+            .Where(x => x.Department.Type == Domain.Enums.DepartmentType.Sampling &&
+                        x.SamplingApprovalState == "AwaitingApproval" && !x.Article.IsDelivered)
+            .Include(x => x.Department)
+            .Include(x => x.Article)
+            .OrderBy(x => x.SamplingSubmittedAt)
+            .ToListAsync();
+    }
+
     public void Update(ArticleDepartmentStatus status)
     {
         _context.ArticleDepartmentStatuses.Update(status);

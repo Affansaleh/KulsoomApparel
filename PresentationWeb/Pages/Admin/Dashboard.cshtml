@@ -194,10 +194,10 @@
                 const dayBadge = r.isDelivered
                     ? '<span class="badge text-bg-secondary">Delivered</span>'
                     : r.isOverdue
-                        ? `<span class="badge text-bg-danger">Overdue by ${Math.abs(r.daysLeft)}d</span>`
+                        ? `<span class="badge text-bg-danger">Overdue by ${Math.abs(r.daysLeft)} days</span>`
                         : (r.isDueSoon
-                            ? `<span class="badge text-bg-warning text-dark">${r.daysLeft}d left</span>`
-                            : `<span class="badge text-bg-light text-dark border">${r.daysLeft}d</span>`);
+                            ? `<span class="badge text-bg-warning text-dark">${r.daysLeft} days left</span>`
+                            : `<span class="badge text-bg-light text-dark border">${r.daysLeft} days</span>`);
 
                 const fabricCell = renderFabrics(r);
 

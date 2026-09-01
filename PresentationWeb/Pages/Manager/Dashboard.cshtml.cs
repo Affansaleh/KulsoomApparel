@@ -42,6 +42,7 @@ public class DashboardModel : PageModel
     public Department? Department { get; set; }
 
     public List<ArticleDepartmentStatusDto> Statuses { get; set; } = new();
+    public List<ArticleDepartmentStatusDto> SamplingApprovals { get; set; } = new();
 
     public List<StitchingTeam> Teams { get; set; } = new();
 
@@ -71,6 +72,9 @@ public class DashboardModel : PageModel
 
         Statuses =
             await _workflowService.GetPendingByDepartmentAsync(deptId);
+
+        if (DepartmentType == DepartmentType.Pattern)
+            SamplingApprovals = await _workflowService.GetSamplingAwaitingApprovalAsync();
 
         Teams = Department.Teams
             .Where(t => t.IsActive)
@@ -346,6 +350,21 @@ public class DashboardModel : PageModel
             TempData["ErrorMessage"] = ex.Message;
         }
 
+        return RedirectToPage("/Manager/Dashboard");
+    }
+
+    public async Task<IActionResult> OnPostReviewSamplingAsync(int statusId, bool approved, string? note)
+    {
+        var userId = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var uid) ? uid : 0;
+        try
+        {
+            await _workflowService.ReviewSamplingAsync(statusId, approved, note, userId);
+            TempData["SuccessMessage"] = approved ? "Sampling approved; Cutting is now unlocked." : "Sampling rejected; resampling returned to the Sampling manager.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
         return RedirectToPage("/Manager/Dashboard");
     }
 
