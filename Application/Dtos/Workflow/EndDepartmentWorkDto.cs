@@ -6,4 +6,5 @@ public class EndDepartmentWorkDto
     public int? OutputQuantity { get; set; }
     public string? Note { get; set; }
     public string? StitchedBy { get; set; }
+    public List<CuttingSizeBreakdownEntryDto> CuttingSizeBreakdowns { get; set; } = new();
 }

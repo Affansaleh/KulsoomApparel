@@ -27,6 +27,7 @@ public class ArticleRepository : IArticleRepository
             .Include(a => a.FabricLinks).ThenInclude(fl => fl.Fabric)
             .Include(a => a.AlternateCodes)
             .Include(a => a.SizeBreakdowns)
+            .Include(a => a.CuttingSizeBreakdowns)
             .Include(a => a.DepartmentStatuses).ThenInclude(ds => ds.Department)
             .FirstOrDefaultAsync(a => a.Id == id);
     }
@@ -87,6 +88,7 @@ public class ArticleRepository : IArticleRepository
             .Include(a => a.FabricLinks).ThenInclude(fl => fl.Fabric)
             .Include(a => a.DepartmentStatuses).ThenInclude(ds => ds.Department)
             .Include(a => a.SizeBreakdowns)
+            .Include(a => a.CuttingSizeBreakdowns)
             .OrderByDescending(a => a.CreatedAt)
             .ToListAsync();
     }

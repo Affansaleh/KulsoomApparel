@@ -106,26 +106,41 @@ public class WorkflowService : IWorkflowService
             status.OutputQuantity = status.InputQuantity;
             status.LossQuantity = 0;
         }
+        else if (status.Department.Type == DepartmentType.Cutting)
+        {
+            if (dto.CuttingSizeBreakdowns.Count == 0)
+                throw new InvalidOperationException("At least one Cutting size quantity is required.");
+            if (dto.CuttingSizeBreakdowns.Any(x => string.IsNullOrWhiteSpace(x.SizeLabel) || x.Quantity < 0))
+                throw new InvalidOperationException("Cutting sizes and quantities are invalid.");
+            if (dto.CuttingSizeBreakdowns.GroupBy(x => x.SizeLabel.Trim(), StringComparer.OrdinalIgnoreCase).Any(g => g.Count() > 1))
+                throw new InvalidOperationException("Duplicate Cutting sizes are not allowed.");
+
+            var article = await _articleRepository.GetByIdAsync(status.ArticleId)
+                ?? throw new InvalidOperationException("Article not found.");
+            article.CuttingSizeBreakdowns.Clear();
+            foreach (var entry in dto.CuttingSizeBreakdowns.OrderBy(x => x.OrderIndex))
+                article.CuttingSizeBreakdowns.Add(new ArticleCuttingSizeBreakdown
+                {
+                    SizeLabel = entry.SizeLabel.Trim(),
+                    OrderIndex = entry.OrderIndex,
+                    Quantity = entry.Quantity
+                });
+
+            status.OutputQuantity = dto.CuttingSizeBreakdowns.Sum(x => x.Quantity);
+            status.LossQuantity = status.InputQuantity.HasValue
+                ? Math.Max(0, status.InputQuantity.Value - status.OutputQuantity.Value)
+                : 0;
+            _articleRepository.Update(article);
+        }
         else
         {
             if (dto.OutputQuantity == null)
                 throw new InvalidOperationException("Output quantity is required to end work for this department.");
+            if (dto.OutputQuantity.Value > (status.InputQuantity ?? 0))
+                throw new InvalidOperationException($"Output quantity cannot exceed the input quantity. Maximum allowed is {status.InputQuantity ?? 0}.");
 
             status.OutputQuantity = dto.OutputQuantity;
-
-            // Cutting has no "input" baseline to compare against (it sets its own baseline).
-            if (status.Department.Type == DepartmentType.Cutting)
-            {
-                status.LossQuantity = 0;
-            }
-            else
-            {
-                // Every step after Cutting is bounded by the quantity it received.
-                if (dto.OutputQuantity.Value > (status.InputQuantity ?? 0))
-                    throw new InvalidOperationException($"Output quantity cannot exceed the input quantity. Maximum allowed is {status.InputQuantity ?? 0}.");
-
-                status.LossQuantity = (status.InputQuantity ?? 0) - dto.OutputQuantity.Value;
-            }
+            status.LossQuantity = (status.InputQuantity ?? 0) - dto.OutputQuantity.Value;
         }
 
         if (status.Department.Type == DepartmentType.Stitching)

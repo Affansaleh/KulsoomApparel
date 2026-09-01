@@ -53,5 +53,6 @@ public class Article
     public ICollection<ArticleFabric> FabricLinks { get; set; } = new List<ArticleFabric>();
     public ICollection<ArticleAlternateCode> AlternateCodes { get; set; } = new List<ArticleAlternateCode>();
     public ICollection<ArticleSizeBreakdown> SizeBreakdowns { get; set; } = new List<ArticleSizeBreakdown>();
+    public ICollection<ArticleCuttingSizeBreakdown> CuttingSizeBreakdowns { get; set; } = new List<ArticleCuttingSizeBreakdown>();
     public ICollection<ArticleDepartmentStatus> DepartmentStatuses { get; set; } = new List<ArticleDepartmentStatus>();
 }

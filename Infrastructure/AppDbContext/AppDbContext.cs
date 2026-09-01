@@ -22,6 +22,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<ArticleFabric> ArticleFabrics => Set<ArticleFabric>();
     public DbSet<ArticleAlternateCode> ArticleAlternateCodes => Set<ArticleAlternateCode>();
     public DbSet<ArticleSizeBreakdown> ArticleSizeBreakdowns => Set<ArticleSizeBreakdown>();
+    public DbSet<ArticleCuttingSizeBreakdown> ArticleCuttingSizeBreakdowns => Set<ArticleCuttingSizeBreakdown>();
     public DbSet<ArticleDepartmentStatus> ArticleDepartmentStatuses => Set<ArticleDepartmentStatus>();
     public DbSet<PasswordResetOtp> PasswordResetOtps => Set<PasswordResetOtp>();
     public DbSet<StatusLog> StatusLogs => Set<StatusLog>();
@@ -140,6 +141,17 @@ public class ApplicationDbContext : DbContext
 
             e.HasOne(sb => sb.Article)
              .WithMany(a => a.SizeBreakdowns)
+             .HasForeignKey(sb => sb.ArticleId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ---------------- ArticleCuttingSizeBreakdown ----------------
+        modelBuilder.Entity<ArticleCuttingSizeBreakdown>(e =>
+        {
+            e.Property(sb => sb.SizeLabel).HasMaxLength(20).IsRequired();
+            e.HasIndex(sb => new { sb.ArticleId, sb.SizeLabel }).IsUnique();
+            e.HasOne(sb => sb.Article)
+             .WithMany(a => a.CuttingSizeBreakdowns)
              .HasForeignKey(sb => sb.ArticleId)
              .OnDelete(DeleteBehavior.Cascade);
         });

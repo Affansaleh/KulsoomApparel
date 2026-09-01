@@ -98,6 +98,39 @@
             </div>
         </div>
 
+        @if (a.SizeBreakdowns.Any() || a.CuttingSizeBreakdowns.Any() || a.BGradeQuantity.HasValue)
+        {
+            <div class="col-12">
+                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#sizeDetailsModal">View Size Details</button>
+            </div>
+            <div class="modal fade" id="sizeDetailsModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg"><div class="modal-content">
+                    <div class="modal-header"><h5 class="modal-title">Quality &amp; Packing Size Breakdown</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead><tr><th>Size</th><th>Cutting Quantity</th><th>A-Grade Quantity</th><th>Difference</th></tr></thead>
+                            <tbody>
+                            @foreach (var cut in a.CuttingSizeBreakdowns.OrderBy(x => x.OrderIndex))
+                            {
+                                var quality = a.SizeBreakdowns.FirstOrDefault(x => x.SizeLabel.Equals(cut.SizeLabel, StringComparison.OrdinalIgnoreCase));
+                                var aq = quality?.Quantity ?? 0;
+                                <tr><td>@cut.SizeLabel</td><td>@cut.Quantity</td><td>@aq</td><td>@(cut.Quantity - aq)</td></tr>
+                            }
+                            </tbody>
+                            <tfoot>
+                                <tr><th>Cutting Total</th><th colspan="3">@a.CuttingSizeTotal</th></tr>
+                                <tr><th>Loss Before Quality</th><th colspan="3">@a.PreQualityLossQuantity</th></tr>
+                                <tr><th>Total A-Grade</th><th colspan="3">@a.AGradeQuantity</th></tr>
+                                <tr><th>B-Grade</th><th colspan="3">@(a.BGradeQuantity ?? 0)</th></tr>
+                                <tr class="table-warning"><th>C-Grade / Quality Loss</th><th colspan="3">@a.CGradeQuantity</th></tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+                </div></div>
+            </div>
+        }
+
         <div class="col-12">
             <div class="card shadow-sm">
                 <div class="card-header">Department Flow &amp; Status</div>
