@@ -1,4 +1,4 @@
-﻿namespace Application.DTOs.Fabric;
+namespace Application.DTOs.Fabric;
 
 public class FabricCreateDto
 {
@@ -6,6 +6,7 @@ public class FabricCreateDto
     public string? InvNum { get; set; }
     public DateTime? FabricDate { get; set; }
     public string FabricType { get; set; } = string.Empty;
+    public string Color { get; set; } = string.Empty;
     public decimal? Quantity { get; set; }
     public string? Unit { get; set; }
     public decimal? Rate { get; set; }

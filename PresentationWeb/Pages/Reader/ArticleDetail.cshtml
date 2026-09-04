@@ -66,15 +66,16 @@
                     @if (a.Fabrics.Any())
                     {
                         <table class="table table-sm align-middle mb-0">
-                            <thead><tr><th>Code</th><th>Type</th><th>Invoice</th><th>Used Qty</th><th>Status</th></tr></thead>
+                            <thead><tr><th>Code</th><th>Type</th><th>Color</th><th>Invoice</th><th>Used Qty</th><th>Status</th></tr></thead>
                             <tbody>
                                 @foreach (var f in a.Fabrics)
                                 {
                                     <tr>
                                         <td>@f.FabricCode</td>
                                         <td>@f.FabricType</td>
+                                        <td>@f.Color</td>
                                         <td>@f.InvNum</td>
-                                        <td>@f.QuantityUsed</td>
+                                        <td>@f.QuantityUsed @f.Unit</td>
                                         <td>
                                             @if (f.Status == "OutOfStock")
                                             {

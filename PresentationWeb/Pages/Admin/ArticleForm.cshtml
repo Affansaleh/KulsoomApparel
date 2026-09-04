@@ -192,7 +192,7 @@
                 row.className = 'row g-2 mb-2 align-items-center fabric-row';
                 row.innerHTML =
                     '<div class="col-md-5">' +
-                        '<span class="badge text-bg-secondary">' + esc(s.code) + '</span> ' +
+                        '<span class="badge text-bg-secondary">' + esc(s.code) + '</span> <span class="badge text-bg-light border">' + esc(s.color || '') + '</span> ' +
                         '<span class="text-muted small">(Avail: ' + s.avail + ' ' + s.unit + ')</span>' +
                     '</div>' +
                     '<div class="col-md-3">' +
@@ -235,13 +235,29 @@
                 suggestions.classList.add('d-none');
                 return;
             }
-            activeFabrics.slice(0, 8).forEach(f => {
+            const groups = Object.values(activeFabrics.reduce((map, f) => {
+                (map[f.fabricCode] ||= []).push(f); return map;
+            }, {}));
+            groups.slice(0, 8).forEach(group => {
+                const first = group[0];
                 const btn = document.createElement('button');
                 btn.type = 'button';
                 btn.className = 'list-group-item list-group-item-action d-flex justify-content-between';
-                btn.innerHTML =
-                    '<span>' + esc(f.fabricCode) + '</span>' +
-                    '<span class="text-muted small">' + esc(f.fabricType || '') + ' · ' + f.availableQuantity + ' ' + f.unit + '</span>';
+                btn.innerHTML = '<span>' + esc(first.fabricCode) + '</span>' +
+                    '<span class="text-muted small">' + esc(first.fabricType || '') + ' · ' + group.length + ' color(s)</span>';
+                btn.addEventListener('click', () => renderColorChoices(group));
+                suggestions.appendChild(btn);
+            });
+            suggestions.classList.remove('d-none');
+        }
+
+        function renderColorChoices(group) {
+            suggestions.innerHTML = '<div class="list-group-item text-muted small">Select fabric color</div>';
+            group.forEach(f => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'list-group-item list-group-item-action d-flex justify-content-between';
+                btn.innerHTML = '<strong>' + esc(f.color) + '</strong><span class="text-muted small">' + f.availableQuantity + ' ' + esc(f.unit) + '</span>';
                 btn.addEventListener('click', () => selectFabric(f));
                 suggestions.appendChild(btn);
             });
@@ -250,7 +266,7 @@
 
         function selectFabric(f) {
             if (!selected.some(s => s.id === f.id)) {
-                selected.push({ id: f.id, code: f.fabricCode, unit: f.unit, avail: f.availableQuantity, qty: '' });
+                selected.push({ id: f.id, code: f.fabricCode, color: f.color, unit: f.unit, avail: f.availableQuantity, qty: '' });
                 renderSelected();
             }
             searchInput.value = '';
@@ -276,6 +292,7 @@
         document.getElementById('openFabricModal').addEventListener('click', function () {
             document.getElementById('nfCode').value = '';
             document.getElementById('nfType').value = '';
+            document.getElementById('nfColor').value = '';
             document.getElementById('nfInv').value = '';
             document.getElementById('nfQty').value = '';
             document.getElementById('nfQtyUsed').value = '';
@@ -292,8 +309,8 @@
 
             const code = document.getElementById('nfCode').value.trim();
             const type = document.getElementById('nfType').value.trim();
-            if (!code || !type) {
-                err.textContent = 'Fabric code and type are required.';
+            if (!code || !type || !document.getElementById('nfColor').value.trim()) {
+                err.textContent = 'Fabric code, type and color are required.';
                 err.classList.remove('d-none');
                 return;
             }
@@ -302,6 +319,7 @@
             const body = new URLSearchParams();
             body.append('NewFabric.FabricCode', code);
             body.append('NewFabric.FabricType', type);
+            body.append('NewFabric.Color', document.getElementById('nfColor').value);
             body.append('NewFabric.InvNum', document.getElementById('nfInv').value);
             body.append('NewFabric.FabricDate', document.getElementById('nfDate').value);
             body.append('NewFabric.Quantity', document.getElementById('nfQty').value || '0');
@@ -327,7 +345,7 @@
             // 2) Stage the created fabric so it links to the article on Create Article.
             const qtyUsed = document.getElementById('nfQtyUsed').value || '0';
             if (!stagedNewFabrics.some(s => s.id === data.id)) {
-                stagedNewFabrics.push({ id: data.id, code: data.fabricCode, quantityUsed: qtyUsed });
+                stagedNewFabrics.push({ id: data.id, code: data.fabricCode, color: data.color, quantityUsed: qtyUsed });
             }
             renderStagedNewFabrics();
 
@@ -583,9 +601,13 @@
                         <input type="date" class="form-control" id="nfDate" />
                     </div>
                     <div class="col-md-6">
+                        <label class="form-label">Fabric Color <span class="text-danger">*</span></label>
+                        <input class="form-control" id="nfColor" />
+                    </div>
+                    <div class="col-md-6">
                         <label class="form-label">Unit</label>
                         <select class="form-select" id="nfUnit">
-                            <option>Meter</option><option>Kilogram</option><option>Yard</option><option>Piece</option><option>Roll</option>
+                            <option>Meter</option><option>Yard</option><option>Kg</option>
                         </select>
                     </div>
                     <div class="col-md-6">

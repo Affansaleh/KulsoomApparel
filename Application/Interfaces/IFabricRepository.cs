@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,6 +15,6 @@ public interface IFabricRepository
     Task<List<Fabric>> GetAllActiveAsync();
     Task AddAsync(Fabric fabric);
     void Update(Fabric fabric);
-    Task<bool> FabricCodeExistsAsync(string fabricCode);
+    Task<bool> FabricVariantExistsAsync(string fabricCode, string color);
     Task SaveChangesAsync();
 }

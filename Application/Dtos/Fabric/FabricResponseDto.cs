@@ -13,6 +13,7 @@ public class FabricResponseDto
     public string? InvNum { get; set; }
     public DateTime? FabricDate { get; set; }
     public string FabricType { get; set; } = string.Empty;
+    public string Color { get; set; } = string.Empty;
     public decimal Quantity { get; set; }
     public decimal AvailableQuantity { get; set; }
     public string Unit { get; set; } = string.Empty;

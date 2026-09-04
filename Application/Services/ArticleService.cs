@@ -644,6 +644,8 @@ public class ArticleService : IArticleService
                                 link.Fabric?.FabricType,
                             InvNum =
                                 link.Fabric?.InvNum,
+                            Color = link.Fabric?.Color,
+                            Unit = link.Fabric?.Unit.ToString(),
                             Status =
                                 link.Fabric?.Status
                                     .ToString()

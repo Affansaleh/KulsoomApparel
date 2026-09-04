@@ -136,7 +136,7 @@
                     <h6 class="text-muted mb-3">Linked Fabrics</h6>
                     <table class="table table-sm align-middle mb-3" style="max-width:800px;" id="existingFabricsTable">
                         <thead>
-                            <tr><th>Code</th><th>Type</th><th>Used Qty</th><th>Status</th><th class="text-end">Actions</th></tr>
+                            <tr><th>Code</th><th>Type</th><th>Color</th><th>Used Qty</th><th>Status</th><th class="text-end">Actions</th></tr>
                         </thead>
                         <tbody>
                             @foreach (var f in Model.ExistingFabrics)
@@ -144,8 +144,9 @@
                                 <tr data-fabric-id="@f.FabricId" data-code="@f.FabricCode">
                                     <td class="fw-semibold">@f.FabricCode</td>
                                     <td>@f.FabricType</td>
+                                    <td>@f.Color</td>
                                     <td>
-                                        <input type="number" step="0.01" min="0" class="form-control form-control-sm ef-qty" value="@f.QuantityUsed" style="width:110px;" />
+                                        <div class="input-group input-group-sm"><input type="number" step="0.01" min="0" class="form-control form-control-sm ef-qty" value="@f.QuantityUsed" style="width:110px;" /><span class="input-group-text">@f.Unit</span></div>
                                     </td>
                                     <td>
                                         @if (f.Status == "OutOfStock")
@@ -281,7 +282,7 @@
                     const row = document.createElement('div');
                     row.className = 'row g-2 mb-2 align-items-center';
                     row.innerHTML =
-                        '<div class="col-md-5"><span class="badge text-bg-secondary">' + esc(s.code) + '</span></div>' +
+                        '<div class="col-md-5"><span class="badge text-bg-secondary">' + esc(s.code) + '</span> <span class="badge text-bg-light border">' + esc(s.color || '') + '</span></div>' +
                         '<div class="col-md-3"><input type="number" step="0.01" min="0" class="form-control form-control-sm nf-qty" value="' + (s.qty || '') + '" placeholder="Qty used" /></div>' +
                         '<div class="col-md-1 d-grid"><button type="button" class="btn btn-outline-danger btn-sm nf-remove"><span class="bi bi-x"></span></button></div>';
                     row.querySelector('.nf-qty').addEventListener('input', function(e) { s.qty = e.target.value; });
@@ -308,16 +309,27 @@
                 }
                 suggestions.innerHTML = '';
                 if (!list.length) { suggestions.classList.add('d-none'); return; }
-                list.slice(0, 8).forEach(function(f) {
+                const groups = Object.values(list.reduce(function(map, f) {
+                    (map[f.fabricCode] ||= []).push(f); return map;
+                }, {}));
+                groups.slice(0, 8).forEach(function(group) {
+                    const first = group[0];
                     const btn = document.createElement('button');
                     btn.type = 'button';
                     btn.className = 'list-group-item list-group-item-action d-flex justify-content-between';
-                    btn.innerHTML = '<span>' + esc(f.fabricCode) + '</span><span class="text-muted small">' + esc(f.fabricType || '') + ' · ' + f.availableQuantity + ' ' + f.unit + '</span>';
+                    btn.innerHTML = '<span>' + esc(first.fabricCode) + '</span><span class="text-muted small">' + esc(first.fabricType || '') + ' · ' + group.length + ' color(s)</span>';
                     btn.addEventListener('click', function() {
-                        newFabrics.push({ id: f.id, code: f.fabricCode, qty: '' });
-                        renderNewFabrics();
-                        searchInput.value = '';
-                        suggestions.classList.add('d-none');
+                        suggestions.innerHTML = '<div class="list-group-item text-muted small">Select fabric color</div>';
+                        group.forEach(function(f) {
+                            const colorBtn = document.createElement('button');
+                            colorBtn.type = 'button'; colorBtn.className = 'list-group-item list-group-item-action d-flex justify-content-between';
+                            colorBtn.innerHTML = '<strong>' + esc(f.color) + '</strong><span class="text-muted small">' + f.availableQuantity + ' ' + esc(f.unit) + '</span>';
+                            colorBtn.addEventListener('click', function() {
+                                newFabrics.push({ id: f.id, code: f.fabricCode, color: f.color, unit: f.unit, qty: '' });
+                                renderNewFabrics(); searchInput.value = ''; suggestions.classList.add('d-none');
+                            });
+                            suggestions.appendChild(colorBtn);
+                        });
                     });
                     suggestions.appendChild(btn);
                 });
@@ -332,7 +344,7 @@
                 const q = searchInput.value.trim().toLowerCase();
                 const match = fabrics.find(function(f) { return f.fabricCode.toLowerCase() === q; });
                 if (match && !isExisting(match.id) && !newFabrics.some(n => n.id === match.id)) {
-                    newFabrics.push({ id: match.id, code: match.fabricCode, qty: '' });
+                    newFabrics.push({ id: match.id, code: match.fabricCode, color: match.color, unit: match.unit, qty: '' });
                     renderNewFabrics();
                     searchInput.value = '';
                 } else {
@@ -403,6 +415,7 @@
             document.getElementById('openFabricModal').addEventListener('click', function() {
                 document.getElementById('nfCode').value = '';
                 document.getElementById('nfType').value = '';
+            document.getElementById('nfColor').value = '';
                 document.getElementById('nfInv').value = '';
                 document.getElementById('nfQty').value = '';
                 document.getElementById('nfQtyUsed').value = '';
@@ -421,8 +434,8 @@
                 const type = document.getElementById('nfType').value.trim();
                 const qty = document.getElementById('nfQty').value;
                 const qtyUsed = document.getElementById('nfQtyUsed').value;
-                if (!code || !type) {
-                    err.textContent = 'Fabric code and type are required.';
+                if (!code || !type || !document.getElementById('nfColor').value.trim()) {
+                    err.textContent = 'Fabric code, type and color are required.';
                     err.classList.remove('d-none');
                     return;
                 }
@@ -434,6 +447,7 @@
                         invNum: document.getElementById('nfInv').value,
                         date: document.getElementById('nfDate').value,
                         type: type,
+                        color: document.getElementById('nfColor').value.trim(),
                         quantity: qty || '0',
                         unit: document.getElementById('nfUnit').value,
                         rate: document.getElementById('nfRate').value || '0'
@@ -493,13 +507,15 @@
                         <input type="date" class="form-control" id="nfDate" />
                     </div>
                     <div class="col-md-6">
+                        <label class="form-label">Fabric Color <span class="text-danger">*</span></label>
+                        <input class="form-control" id="nfColor" />
+                    </div>
+                    <div class="col-md-6">
                         <label class="form-label">Unit</label>
                         <select class="form-select" id="nfUnit">
                             <option>Meter</option>
-                            <option>Kilogram</option>
                             <option>Yard</option>
-                            <option>Piece</option>
-                            <option>Roll</option>
+                            <option>Kg</option>
                         </select>
                     </div>
                     <div class="col-md-6">

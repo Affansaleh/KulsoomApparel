@@ -638,6 +638,7 @@
                             <tr>
                                 <th>Fabric Code</th>
                                 <th>Fabric Type</th>
+                                <th>Color</th>
                                 <th>Invoice</th>
                                 <th>Used Quantity</th>
                                 <th>Status</th>
@@ -1405,6 +1406,7 @@
                             "</td>" +
                             "<td>" +
                             escapeHtml(fabric.fabricType || "—") +
+                            "</td><td>" + escapeHtml(fabric.color || "—") +
                             "</td>" +
                             "<td>" +
                             escapeHtml(fabric.invNum || "—") +

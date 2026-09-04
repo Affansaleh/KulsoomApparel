@@ -128,6 +128,7 @@ public class ExportService : IExportService
                 {
                     "Fabric Codes",
                     "Fabric Types",
+                    "Fabric Colors",
                     "Fabric Quantities Used"
                 });
         }
@@ -233,11 +234,14 @@ public class ExportService : IExportService
                                 link.Fabric?.FabricType ?? string.Empty));
 
                 worksheet.Cell(rowNumber, columnNumber++)
+                    .Value = string.Join(", ", article.FabricLinks.Select(link => link.Fabric?.Color ?? string.Empty));
+
+                worksheet.Cell(rowNumber, columnNumber++)
                     .Value = string.Join(
                         ", ",
                         article.FabricLinks
                             .Select(link =>
-                                link.QuantityUsed.ToString()));
+                                $"{link.QuantityUsed} {link.Fabric?.Unit}"));
             }
 
             if (includePricing)

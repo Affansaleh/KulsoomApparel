@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,5 +12,7 @@ public class ArticleFabricDto
     public string? InvNum { get; set; }
     public string? Status { get; set; }
     public string? FabricCode { get; set; }
+    public string? Color { get; set; }
+    public string? Unit { get; set; }
     public decimal QuantityUsed { get; set; }
 }

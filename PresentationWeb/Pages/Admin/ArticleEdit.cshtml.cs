@@ -201,6 +201,7 @@ public class ArticleEditModel : PageModel
                     InvNum = GetStr(f, "invNum"),
                     FabricDate = GetDate(f, "date"),
                     FabricType = GetStr(f, "type"),
+                    Color = GetStr(f, "color") ?? string.Empty,
                     Quantity = GetDec(f, "quantity"),
                     Unit = GetStr(f, "unit"),
                     Rate = GetDec(f, "rate")

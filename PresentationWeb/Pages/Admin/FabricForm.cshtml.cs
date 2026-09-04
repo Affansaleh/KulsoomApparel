@@ -18,6 +18,7 @@ public class FabricsModel : PageModel
 
     public List<FabricResponseDto> AllFabrics { get; set; } = new();
     public List<FabricResponseDto> InStockFabrics { get; set; } = new();
+    public decimal TotalAvailableStockValue { get; set; }
 
     [BindProperty]
     public FabricCreateDto AddFabric { get; set; } = new();
@@ -34,6 +35,7 @@ public class FabricsModel : PageModel
     {
         AllFabrics = await _fabricService.GetAllAsync();
         InStockFabrics = AllFabrics.Where(f => f.Status == "InStock").ToList();
+        TotalAvailableStockValue = AllFabrics.Sum(f => f.AvailableQuantity * f.Rate);
     }
 
     public async Task<IActionResult> OnPostAddAsync()

@@ -75,9 +75,10 @@ public class ApplicationDbContext : DbContext
         // ---------------- Fabric ----------------
         modelBuilder.Entity<Fabric>(e =>
         {
-            e.HasIndex(f => f.FabricCode).IsUnique();
+            e.HasIndex(f => new { f.FabricCode, f.Color }).IsUnique();
             e.Property(f => f.FabricCode).HasMaxLength(50).IsRequired();
             e.Property(f => f.FabricType).HasMaxLength(50).IsRequired();
+            e.Property(f => f.Color).HasMaxLength(50).IsRequired();
 
             e.Property(f => f.Quantity).HasPrecision(18, 2);
             e.Property(f => f.AvailableQuantity).HasPrecision(18, 2);

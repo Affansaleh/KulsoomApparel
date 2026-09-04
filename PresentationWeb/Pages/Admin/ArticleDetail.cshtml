@@ -300,8 +300,9 @@
                                     <tr>
                                         <td>@f.FabricCode</td>
                                         <td>@f.FabricType</td>
+                                        <td>@f.Color</td>
                                         <td>@f.InvNum</td>
-                                        <td>@f.QuantityUsed</td>
+                                        <td>@f.QuantityUsed @f.Unit</td>
                                         <td>
                                             @if (f.Status == "OutOfStock")
                                             {
