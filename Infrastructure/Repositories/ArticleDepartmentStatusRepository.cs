@@ -41,6 +41,7 @@ public class ArticleDepartmentStatusRepository : IArticleDepartmentStatusReposit
         return await _context.ArticleDepartmentStatuses
             .Where(ads => ads.DepartmentId == departmentId)
             .Include(ads => ads.Article)
+            .Include(ads => ads.Department)
             .ToListAsync();
     }
 
