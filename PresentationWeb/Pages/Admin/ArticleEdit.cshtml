@@ -445,8 +445,8 @@
             };
 
             // ============ Inline Add New Fabric modal ============
-            // The trigger button lives inside the same @if (!Model.CuttingStarted) block as the
-            // search box, so it is absent once Cutting has started.
+            // The trigger button lives inside the same conditional block as the search
+            // box (rendered only while Cutting has NOT started), so it can be absent.
             const openFabricModalBtn = document.getElementById('openFabricModal');
             const nfSaveBtn = document.getElementById('nfSave');
             if (openFabricModalBtn && nfSaveBtn) {
