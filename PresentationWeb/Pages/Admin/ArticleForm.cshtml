@@ -21,7 +21,7 @@
 
     <div class="card shadow-sm">
         <div class="card-body">
-            <form method="post" onsubmit="window.buildFabricJson && window.buildFabricJson();">
+            <form method="post" onsubmit="return window.buildFabricJson ? window.buildFabricJson() : true;">
                 <input type="hidden" asp-for="FabricLinksJson" id="fabricLinksJson" />
                 <input type="hidden" asp-for="NewFabricLinksJson" id="newFabricLinksJson" />
                 <div class="row g-3">
@@ -89,21 +89,13 @@
                     <div class="col-md-12">
                         <label class="form-label d-block mb-2">Link Fabrics (optional)</label>
 
-                        <div class="row g-2 mb-2 align-items-center">
-                            <div class="col-md-7">
-                                <div class="position-relative">
-                                    <input type="text" class="form-control" id="fabricSearch" placeholder="Search existing fabric by code / type / invoice..." autocomplete="off" />
-                                    <div class="list-group position-absolute w-100 d-none" id="fabricSuggestions" style="z-index:1050; max-height:220px; overflow-y:auto;"></div>
-                                </div>
-                            </div>
-                            <div class="col-md-5 d-flex gap-2">
-                                <button type="button" class="btn btn-outline-primary btn-sm" id="addSelectedFabric">
-                                    <span class="bi bi-plus-lg"></span> Add Selected
-                                </button>
-                                <button type="button" class="btn btn-outline-success btn-sm" id="openFabricModal">
-                                    <span class="bi bi-patch-plus"></span> Add New Fabric
-                                </button>
-                            </div>
+                        <div class="d-flex gap-2 mb-2">
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="openFabricPicker">
+                                <span class="bi bi-list-check"></span> Select Fabric
+                            </button>
+                            <button type="button" class="btn btn-outline-success btn-sm" id="openFabricModal">
+                                <span class="bi bi-patch-plus"></span> Add New Fabric
+                            </button>
                         </div>
 
                         <div id="selectedFabricRows"></div>
@@ -161,432 +153,466 @@
 </div>
 
 @section Scripts {
-<script>
-    (function () {
-        @{
-            var fabricsJson = System.Text.Json.JsonSerializer.Serialize(
-                Model.Fabrics.Select(f => new { f.Id, f.FabricCode, f.Color, f.FabricType, f.InvNum, f.Unit, f.AvailableQuantity }),
-                new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
-        }
-        const fabrics = @Html.Raw(fabricsJson);
-        @{
-            var deptsJson = System.Text.Json.JsonSerializer.Serialize(
-                Model.Departments.Select(d => new { d.Id, d.Name, d.Type, d.OrderIndex }),
-                new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
-        }
-        const departments = @Html.Raw(deptsJson);
+    <script>
+        (function() {
+            @{
+                    var fabricsJson = System.Text.Json.JsonSerializer.Serialize(
+                                    Model.Fabrics.Select(f => new { f.Id, f.FabricCode, f.Color, f.FabricType, f.InvNum, f.Unit, f.AvailableQuantity }),
+                    new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+                }
+                const fabrics = @Html.Raw(fabricsJson);
+            @{
+                    var deptsJson = System.Text.Json.JsonSerializer.Serialize(
+                                    Model.Departments.Select(d => new { d.Id, d.Name, d.Type, d.OrderIndex }),
+                    new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+                }
+                const departments = @Html.Raw(deptsJson);
 
-        const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
 
-        // ---- Selected fabrics (posted with article) ----
-        const selectedContainer = document.getElementById('selectedFabricRows');
-        const noFabricsMsg = document.getElementById('noFabricsMsg');
-        let selected = [];  // { id, code, unit, qty }
+            // ---- Selected fabrics (posted with article) ----
+            const selectedContainer = document.getElementById('selectedFabricRows');
+            const noFabricsMsg = document.getElementById('noFabricsMsg');
+            let selected = [];  // { id, code, unit, qty }
 
-        function renderSelected() {
-            selectedContainer.innerHTML = '';
-            noFabricsMsg.classList.toggle('d-none', selected.length > 0);
+            function renderSelected() {
+                selectedContainer.innerHTML = '';
+                noFabricsMsg.classList.toggle('d-none', selected.length > 0);
 
-            selected.forEach((s, idx) => {
-                const row = document.createElement('div');
-                row.className = 'row g-2 mb-2 align-items-center fabric-row';
-                row.innerHTML =
-                    '<div class="col-md-5">' +
+                selected.forEach((s, idx) => {
+                    const row = document.createElement('div');
+                    row.className = 'row g-2 mb-2 align-items-center fabric-row';
+                    row.innerHTML =
+                        '<div class="col-md-5">' +
                         '<span class="badge text-bg-secondary">' + esc(s.code) + '</span> <span class="badge text-bg-light border">' + esc(s.color || '') + '</span> ' +
                         '<span class="text-muted small">(Avail: ' + s.avail + ' ' + s.unit + ')</span>' +
-                    '</div>' +
-                    '<div class="col-md-3">' +
+                        '</div>' +
+                        '<div class="col-md-3">' +
                         '<input type="number" step="0.01" min="0" class="form-control form-control-sm qty-input" placeholder="Qty used" value="' + (s.qty || '') + '" />' +
-                    '</div>' +
-                    '<div class="col-md-2 d-grid">' +
+                        '</div>' +
+                        '<div class="col-md-2 d-grid">' +
                         '<button type="button" class="btn btn-outline-danger btn-sm remove-fabric"><span class="bi bi-x"></span></button>' +
-                    '</div>';
+                        '</div>';
 
-                row.querySelector('.qty-input').addEventListener('input', function (e) {
-                    s.qty = e.target.value || '0';
+                    row.querySelector('.qty-input').addEventListener('input', function(e) {
+                        s.qty = e.target.value || '0';
+                    });
+                    row.querySelector('.remove-fabric').addEventListener('click', function() {
+                        selected.splice(idx, 1);
+                        renderSelected();
+                    });
+
+                    selectedContainer.appendChild(row);
                 });
-                row.querySelector('.remove-fabric').addEventListener('click', function () {
-                    selected.splice(idx, 1);
+            }
+
+            // ---- Fabric picker sidebar: click a fabric code, see ALL its colors, set qty + Add each ----
+            function selectFabric(f, qty) {
+                if (!selected.some(s => s.id === f.id)) {
+                    selected.push({ id: f.id, code: f.fabricCode, color: f.color, unit: f.unit, avail: f.availableQuantity, qty: qty || '' });
                     renderSelected();
+                }
+            }
+
+            const pickerOffcanvasEl = document.getElementById('fabricPickerOffcanvas');
+            const pickerOffcanvas = new bootstrap.Offcanvas(pickerOffcanvasEl);
+            const pickerSearch = document.getElementById('fabricPickerSearch');
+            const pickerList = document.getElementById('fabricPickerList');
+            let openGroupCode = null; // which fabric code's color list is currently expanded
+
+            function groupedFabrics(query) {
+                const q = (query || '').trim().toLowerCase();
+                const filtered = !q ? fabrics : fabrics.filter(f =>
+                    f.fabricCode.toLowerCase().includes(q) ||
+                    (f.color || '').toLowerCase().includes(q) ||
+                    (f.fabricType || '').toLowerCase().includes(q) ||
+                    (f.invNum || '').toLowerCase().includes(q));
+                const map = {};
+                filtered.forEach(f => { (map[f.fabricCode] ||= []).push(f); });
+                return Object.entries(map);
+            }
+
+            function renderPicker() {
+                const groups = groupedFabrics(pickerSearch.value);
+                pickerList.innerHTML = '';
+                if (!groups.length) {
+                    pickerList.innerHTML = '<div class="text-muted small p-3">No fabrics found.</div>';
+                    return;
+                }
+                groups.forEach(([code, variants]) => {
+                    const isOpen = openGroupCode === code;
+                    const header = document.createElement('button');
+                    header.type = 'button';
+                    header.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+                    header.innerHTML = '<span>' + esc(code) + '</span>' +
+                        '<span class="text-muted small">' + esc(variants[0].fabricType || '') + ' · ' + variants.length + ' color(s) ' +
+                        '<span class="bi bi-chevron-' + (isOpen ? 'up' : 'down') + '"></span></span>';
+                    header.addEventListener('click', function() {
+                        openGroupCode = isOpen ? null : code;
+                        renderPicker();
+                    });
+                    pickerList.appendChild(header);
+
+                    if (!isOpen) return;
+
+                    variants.forEach(f => {
+                        const already = selected.some(s => s.id === f.id);
+                        const row = document.createElement('div');
+                        row.className = 'p-2 border-bottom bg-body-tertiary';
+                        row.innerHTML =
+                            '<div class="d-flex justify-content-between align-items-center mb-1">' +
+                            '<span class="badge text-bg-light border">' + esc(f.color || 'Unspecified') + '</span>' +
+                            '<span class="text-muted small">Avail: ' + f.availableQuantity + ' ' + esc(f.unit) + '</span>' +
+                            '</div>' +
+                            '<div class="d-flex gap-2">' +
+                            '<input type="number" step="0.01" min="0" class="form-control form-control-sm picker-qty" placeholder="Qty used" ' + (already ? 'disabled' : '') + ' />' +
+                            '<button type="button" class="btn btn-sm ' + (already ? 'btn-outline-secondary' : 'btn-outline-primary') + ' picker-add flex-shrink-0" ' + (already ? 'disabled' : '') + '>' +
+                            (already ? 'Added' : '<span class="bi bi-plus-lg"></span> Add') +
+                            '</button>' +
+                            '</div>';
+
+                        if (!already) {
+                            const qtyInput = row.querySelector('.picker-qty');
+                            row.querySelector('.picker-add').addEventListener('click', function() {
+                                const qty = qtyInput.value;
+                                if (!(Number(qty) > 0)) {
+                                    showToast('Enter a quantity for ' + (f.color || code) + ' before adding.', 'warning');
+                                    return;
+                                }
+                                selectFabric(f, qty);
+                                renderPicker();
+                            });
+                        }
+                        pickerList.appendChild(row);
+                    });
+                });
+            }
+
+            document.getElementById('openFabricPicker').addEventListener('click', function() {
+                openGroupCode = null;
+                pickerSearch.value = '';
+                renderPicker();
+                pickerOffcanvas.show();
+            });
+            pickerSearch.addEventListener('input', renderPicker);
+
+            // ---- Add New Fabric: create master immediately, then stage the link ----
+            let stagedNewFabrics = [];
+
+            document.getElementById('openFabricModal').addEventListener('click', function() {
+                document.getElementById('nfCode').value = '';
+                document.getElementById('nfType').value = '';
+                document.getElementById('nfColor').value = '';
+                document.getElementById('nfInv').value = '';
+                document.getElementById('nfQty').value = '';
+                document.getElementById('nfQtyUsed').value = '';
+                document.getElementById('nfDate').value = new Date().toISOString().slice(0, 10);
+                document.getElementById('nfUnit').value = 'Meter';
+                document.getElementById('nfRate').value = '';
+                document.getElementById('nfError').classList.add('d-none');
+                new bootstrap.Modal(document.getElementById('fabricModal')).show();
+            });
+
+            document.getElementById('nfSave').addEventListener('click', async function() {
+                const err = document.getElementById('nfError');
+                err.classList.add('d-none');
+
+                const code = document.getElementById('nfCode').value.trim();
+                const type = document.getElementById('nfType').value.trim();
+                if (!code || !type || !document.getElementById('nfColor').value.trim()) {
+                    err.textContent = 'Fabric code, type and color are required.';
+                    err.classList.remove('d-none');
+                    return;
+                }
+
+                // 1) Create the fabric master record immediately via the API.
+                const body = new URLSearchParams();
+                body.append('NewFabric.FabricCode', code);
+                body.append('NewFabric.FabricType', type);
+                body.append('NewFabric.Color', document.getElementById('nfColor').value);
+                body.append('NewFabric.InvNum', document.getElementById('nfInv').value);
+                body.append('NewFabric.FabricDate', document.getElementById('nfDate').value);
+                body.append('NewFabric.Quantity', document.getElementById('nfQty').value || '0');
+                body.append('NewFabric.Unit', document.getElementById('nfUnit').value);
+                body.append('NewFabric.Rate', document.getElementById('nfRate').value || '0');
+
+                const res = await fetch('@Url.Page("ArticleForm", "AddFabric")', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'RequestVerificationToken': token
+                    },
+                    body: body.toString()
+                });
+                const data = await res.json();
+
+                if (!data.success) {
+                    err.textContent = data.message || 'Could not create fabric.';
+                    err.classList.remove('d-none');
+                    return;
+                }
+
+                // 2) Stage the created fabric so it links to the article on Create Article.
+                const qtyUsed = document.getElementById('nfQtyUsed').value || '0';
+                if (!stagedNewFabrics.some(s => s.id === data.id)) {
+                    stagedNewFabrics.push({ id: data.id, code: data.fabricCode, color: data.color, quantityUsed: qtyUsed });
+                }
+                renderStagedNewFabrics();
+
+                bootstrap.Modal.getInstance(document.getElementById('fabricModal')).hide();
+                showToast('Fabric created. It will be linked to the article on Create Article.', 'success');
+            });
+
+            function renderStagedNewFabrics() {
+                const container = document.getElementById('stagedNewFabricRows');
+                container.innerHTML = '';
+                stagedNewFabrics.forEach(function(s, idx) {
+                    const row = document.createElement('div');
+                    row.className = 'row g-2 mb-2 align-items-center';
+                    row.innerHTML =
+                        '<div class="col-md-4"><span class="badge text-bg-success">' + esc(s.code) + '</span> <span class="text-muted small">(new)</span></div>' +
+                        '<div class="col-md-3 text-muted small">Qty used: ' + esc(s.quantityUsed) + '</div>' +
+                        '<div class="col-md-1 d-grid"><button type="button" class="btn btn-outline-danger btn-sm snf-remove"><span class="bi bi-x"></span></button></div>';
+                    row.querySelector('.snf-remove').addEventListener('click', function() {
+                        stagedNewFabrics.splice(idx, 1);
+                        renderStagedNewFabrics();
+                    });
+                    container.appendChild(row);
+                });
+            }
+
+            // ---- Before submit: build fabric link JSON (inline onsubmit on the form) ----
+            // Both searched existing fabrics AND newly-created fabrics go into FabricLinksJson
+            // ({fabricId: qty}). New fabrics were already created as master records on "Add New Fabric",
+            // so nothing goes into NewFabricLinksJson here.
+            const fabricLinksJson = document.getElementById('fabricLinksJson');
+            const newLinksJson = document.getElementById('newFabricLinksJson');
+            window.buildFabricJson = function() {
+                const map = {};
+                const missingQty = [];
+                selected.forEach(function(s) {
+                    const q = Number(s.qty);
+                    if (q > 0) { map[s.id] = q; }
+                    else { missingQty.push(s.code + (s.color ? ' (' + s.color + ')' : '')); }
+                });
+                stagedNewFabrics.forEach(function(s) {
+                    const q = Number(s.quantityUsed);
+                    if (q > 0) { map[s.id] = q; }
+                    else { missingQty.push(s.code + ' (new)'); }
                 });
 
-                selectedContainer.appendChild(row);
-            });
-        }
+                // Previously this just warned and silently dropped the fabric from the
+                // submit — since the page redirects right after a successful save, the
+                // toast was never seen and the fabric quietly never got linked. Block the
+                // submit instead so the user actually fixes it.
+                if (missingQty.length) {
+                    if (window.showToast) {
+                        showToast('Set a quantity used for: ' + missingQty.join(', ') + ' before saving.', 'danger');
+                    }
+                    return false;
+                }
 
-        // ---- Searchable picker ----
-        const searchInput = document.getElementById('fabricSearch');
-        const suggestions = document.getElementById('fabricSuggestions');
-        let activeFabrics = [];
+                fabricLinksJson.value = JSON.stringify(map);
+                newLinksJson.value = '';
+                return true;
+            };
 
-        function filter() {
-            const q = searchInput.value.trim().toLowerCase();
-            activeFabrics = fabrics.filter(f =>
-                !selected.some(s => s.id === f.id) &&
-                (f.fabricCode.toLowerCase().includes(q) ||
-                 (f.color || '').toLowerCase().includes(q) ||
-                 (f.fabricType || '').toLowerCase().includes(q) ||
-                 (f.invNum || '').toLowerCase().includes(q)));
-            renderSuggestions();
-        }
-
-        function renderSuggestions() {
-            suggestions.innerHTML = '';
-            if (!activeFabrics.length) {
-                suggestions.classList.add('d-none');
-                return;
-            }
-            const groups = Object.values(activeFabrics.reduce((map, f) => {
-                (map[f.fabricCode] ||= []).push(f); return map;
-            }, {}));
-            groups.slice(0, 8).forEach(group => {
-                const first = group[0];
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'list-group-item list-group-item-action d-flex justify-content-between';
-                btn.innerHTML = '<span>' + esc(first.fabricCode) + '</span>' +
-                    '<span class="text-muted small">' + esc(first.fabricType || '') + ' · ' + group.length + ' color(s)</span>';
-                btn.addEventListener('click', () => renderColorChoices(group));
-                suggestions.appendChild(btn);
-            });
-            suggestions.classList.remove('d-none');
-        }
-
-        function renderColorChoices(group) {
-            suggestions.innerHTML = '<div class="list-group-item text-muted small">Select fabric color</div>';
-            group.forEach(f => {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'list-group-item list-group-item-action d-flex justify-content-between';
-                btn.innerHTML = '<strong>' + esc(f.color || 'Unspecified') + '</strong><span class="text-muted small">' + f.availableQuantity + ' ' + esc(f.unit) + '</span>';
-                btn.addEventListener('click', () => selectFabric(f));
-                suggestions.appendChild(btn);
-            });
-            suggestions.classList.remove('d-none');
-        }
-
-        function selectFabric(f) {
-            if (!selected.some(s => s.id === f.id)) {
-                selected.push({ id: f.id, code: f.fabricCode, color: f.color, unit: f.unit, avail: f.availableQuantity, qty: '' });
-                renderSelected();
-            }
-            searchInput.value = '';
-            suggestions.classList.add('d-none');
-        }
-
-        searchInput.addEventListener('input', filter);
-        searchInput.addEventListener('focus', () => { filter(); });
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.position-relative')) suggestions.classList.add('d-none');
-        });
-
-        // "Add Selected": if the typed code has several color variants, open the color
-        // list instead of silently grabbing the first variant.
-        document.getElementById('addSelectedFabric').addEventListener('click', function () {
-            const q = searchInput.value.trim().toLowerCase();
-            const matches = fabrics.filter(f =>
-                f.fabricCode.toLowerCase() === q && !selected.some(s => s.id === f.id));
-
-            if (matches.length > 1) { renderColorChoices(matches); return; }
-            if (matches.length === 1) { selectFabric(matches[0]); return; }
-
-            showToast('No matching fabric found. Type a code and pick from the list, or use "Add New Fabric".', 'warning');
-        });
-
-        // ---- Add New Fabric: create master immediately, then stage the link ----
-        let stagedNewFabrics = [];
-
-        document.getElementById('openFabricModal').addEventListener('click', function () {
-            document.getElementById('nfCode').value = '';
-            document.getElementById('nfType').value = '';
-            document.getElementById('nfColor').value = '';
-            document.getElementById('nfInv').value = '';
-            document.getElementById('nfQty').value = '';
-            document.getElementById('nfQtyUsed').value = '';
-            document.getElementById('nfDate').value = new Date().toISOString().slice(0, 10);
-            document.getElementById('nfUnit').value = 'Meter';
-            document.getElementById('nfRate').value = '';
-            document.getElementById('nfError').classList.add('d-none');
-            new bootstrap.Modal(document.getElementById('fabricModal')).show();
-        });
-
-        document.getElementById('nfSave').addEventListener('click', async function () {
-            const err = document.getElementById('nfError');
-            err.classList.add('d-none');
-
-            const code = document.getElementById('nfCode').value.trim();
-            const type = document.getElementById('nfType').value.trim();
-            if (!code || !type || !document.getElementById('nfColor').value.trim()) {
-                err.textContent = 'Fabric code, type and color are required.';
-                err.classList.remove('d-none');
-                return;
+            // ---- Utilities ----
+            function esc(s) {
+                if (!s) return '';
+                const d = document.createElement('div');
+                d.textContent = String(s);
+                return d.innerHTML;
             }
 
-            // 1) Create the fabric master record immediately via the API.
-            const body = new URLSearchParams();
-            body.append('NewFabric.FabricCode', code);
-            body.append('NewFabric.FabricType', type);
-            body.append('NewFabric.Color', document.getElementById('nfColor').value);
-            body.append('NewFabric.InvNum', document.getElementById('nfInv').value);
-            body.append('NewFabric.FabricDate', document.getElementById('nfDate').value);
-            body.append('NewFabric.Quantity', document.getElementById('nfQty').value || '0');
-            body.append('NewFabric.Unit', document.getElementById('nfUnit').value);
-            body.append('NewFabric.Rate', document.getElementById('nfRate').value || '0');
+            renderSelected();
 
-            const res = await fetch('@Url.Page("ArticleForm", "AddFabric")', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'RequestVerificationToken': token
-                },
-                body: body.toString()
-            });
-            const data = await res.json();
+            // ===================== Department Flow =====================
+            const DEPT_TYPE = {
+                Printing: 'Printing',
+                Embroidery: 'Embroidery',
+                HandWork: 'HandWork'
+            };
 
-            if (!data.success) {
-                err.textContent = data.message || 'Could not create fabric.';
-                err.classList.remove('d-none');
-                return;
+            let deptSelected = [];   // array of department ids, in order
+
+            // Is this department type gated by an embellishment checkbox?
+            function embellDeptType(t) {
+                if (t === DEPT_TYPE.Printing) return 'printing';
+                if (t === DEPT_TYPE.Embroidery) return 'embroidery';
+                if (t === DEPT_TYPE.HandWork) return 'handwork';
+                return null;
             }
 
-            // 2) Stage the created fabric so it links to the article on Create Article.
-            const qtyUsed = document.getElementById('nfQtyUsed').value || '0';
-            if (!stagedNewFabrics.some(s => s.id === data.id)) {
-                stagedNewFabrics.push({ id: data.id, code: data.fabricCode, color: data.color, quantityUsed: qtyUsed });
+            // Compute default flow: always-included departments + currently-checked embellishments, in OrderIndex order.
+            function defaultFlow() {
+                const printing = document.getElementById('Input_EmbellishmentPrinting').checked;
+                const embroidery = document.getElementById('Input_EmbellishmentEmbroidery').checked;
+                const handwork = document.getElementById('Input_EmbellishmentHandwork').checked;
+
+                return departments
+                    .filter(d => {
+                        const gate = embellDeptType(d.type);
+                        if (gate === 'printing') return printing;
+                        if (gate === 'embroidery') return embroidery;
+                        if (gate === 'handwork') return handwork;
+                        return true; // always included
+                    })
+                    .sort((a, b) => a.orderIndex - b.orderIndex)
+                    .map(d => d.id);
             }
-            renderStagedNewFabrics();
 
-            bootstrap.Modal.getInstance(document.getElementById('fabricModal')).hide();
-            showToast('Fabric created. It will be linked to the article on Create Article.', 'success');
-        });
+            function renderDeptFlow() {
+                // Available = all departments not in selected AND whose gate (embellishment) is active
+                const avail = departments.filter(d => !deptSelected.includes(d.id) && isDeptGateActive(d));
 
-        function renderStagedNewFabrics() {
-            const container = document.getElementById('stagedNewFabricRows');
-            container.innerHTML = '';
-            stagedNewFabrics.forEach(function (s, idx) {
-                const row = document.createElement('div');
-                row.className = 'row g-2 mb-2 align-items-center';
-                row.innerHTML =
-                    '<div class="col-md-4"><span class="badge text-bg-success">' + esc(s.code) + '</span> <span class="text-muted small">(new)</span></div>' +
-                    '<div class="col-md-3 text-muted small">Qty used: ' + esc(s.quantityUsed) + '</div>' +
-                    '<div class="col-md-1 d-grid"><button type="button" class="btn btn-outline-danger btn-sm snf-remove"><span class="bi bi-x"></span></button></div>';
-                row.querySelector('.snf-remove').addEventListener('click', function () {
-                    stagedNewFabrics.splice(idx, 1);
-                    renderStagedNewFabrics();
+                const availEl = document.getElementById('deptAvailable');
+                availEl.innerHTML = '';
+                document.getElementById('deptAvailableEmpty').classList.toggle('d-none', avail.length > 0);
+                avail.forEach(d => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+                    btn.innerHTML = '<span>' + esc(d.name) + '</span><span class="bi bi-plus-lg text-muted"></span>';
+                    btn.addEventListener('click', function() {
+                        if (!deptSelected.includes(d.id)) {
+                            deptSelected.push(d.id);
+                            renderDeptFlow();
+                        }
+                    });
+                    availEl.appendChild(btn);
                 });
-                container.appendChild(row);
-            });
-        }
 
-        // ---- Before submit: build fabric link JSON (inline onsubmit on the form) ----
-        // Both searched existing fabrics AND newly-created fabrics go into FabricLinksJson
-        // ({fabricId: qty}). New fabrics were already created as master records on "Add New Fabric",
-        // so nothing goes into NewFabricLinksJson here.
-        const fabricLinksJson = document.getElementById('fabricLinksJson');
-        const newLinksJson = document.getElementById('newFabricLinksJson');
-        window.buildFabricJson = function () {
-            const map = {};
-            const missingQty = [];
-            selected.forEach(function (s) {
-                const q = Number(s.qty);
-                if (q > 0) { map[s.id] = q; }
-                else { missingQty.push(s.code + (s.color ? ' (' + s.color + ')' : '')); }
-            });
-            stagedNewFabrics.forEach(function (s) {
-                const q = Number(s.quantityUsed);
-                if (q > 0) { map[s.id] = q; }
-                else { missingQty.push(s.code + ' (new)'); }
-            });
-            fabricLinksJson.value = JSON.stringify(map);
-            newLinksJson.value = '';
+                const selEl = document.getElementById('deptSelected');
+                selEl.innerHTML = '';
+                document.getElementById('deptSelectedEmpty').classList.toggle('d-none', deptSelected.length > 0);
 
-            if (missingQty.length && window.showToast) {
-                showToast('Qty used is 0 or empty for: ' + missingQty.join(', ') + ' — those fabrics will NOT be linked.', 'warning');
-            }
-        };
+                deptSelected.forEach((id, idx) => {
+                    const d = departments.find(x => x.id === id);
+                    if (!d) return;
+                    const row = document.createElement('div');
+                    row.className = 'list-group-item d-flex align-items-center gap-2 dept-row';
+                    row.draggable = true;
+                    row.dataset.idx = idx;
+                    row.innerHTML =
+                        '<span class="badge text-bg-dark">' + (idx + 1) + '</span>' +
+                        '<span class="flex-grow-1">' + esc(d.name) + '</span>' +
+                        '<span class="bi bi-grip-vertical text-muted" title="Hold & slide to reorder"></span>' +
+                        '<button type="button" class="btn btn-sm btn-outline-danger dept-remove" title="Remove"><span class="bi bi-x"></span></button>';
 
-        // ---- Utilities ----
-        function esc(s) {
-            if (!s) return '';
-            const d = document.createElement('div');
-            d.textContent = String(s);
-            return d.innerHTML;
-        }
-
-        renderSelected();
-
-        // ===================== Department Flow =====================
-        const DEPT_TYPE = {
-            Printing: 'Printing',
-            Embroidery: 'Embroidery',
-            HandWork: 'HandWork'
-        };
-
-        let deptSelected = [];   // array of department ids, in order
-
-        // Is this department type gated by an embellishment checkbox?
-        function embellDeptType(t) {
-            if (t === DEPT_TYPE.Printing) return 'printing';
-            if (t === DEPT_TYPE.Embroidery) return 'embroidery';
-            if (t === DEPT_TYPE.HandWork) return 'handwork';
-            return null;
-        }
-
-        // Compute default flow: always-included departments + currently-checked embellishments, in OrderIndex order.
-        function defaultFlow() {
-            const printing = document.getElementById('Input_EmbellishmentPrinting').checked;
-            const embroidery = document.getElementById('Input_EmbellishmentEmbroidery').checked;
-            const handwork = document.getElementById('Input_EmbellishmentHandwork').checked;
-
-            return departments
-                .filter(d => {
-                    const gate = embellDeptType(d.type);
-                    if (gate === 'printing') return printing;
-                    if (gate === 'embroidery') return embroidery;
-                    if (gate === 'handwork') return handwork;
-                    return true; // always included
-                })
-                .sort((a, b) => a.orderIndex - b.orderIndex)
-                .map(d => d.id);
-        }
-
-        function renderDeptFlow() {
-            // Available = all departments not in selected AND whose gate (embellishment) is active
-            const avail = departments.filter(d => !deptSelected.includes(d.id) && isDeptGateActive(d));
-
-            const availEl = document.getElementById('deptAvailable');
-            availEl.innerHTML = '';
-            document.getElementById('deptAvailableEmpty').classList.toggle('d-none', avail.length > 0);
-            avail.forEach(d => {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
-                btn.innerHTML = '<span>' + esc(d.name) + '</span><span class="bi bi-plus-lg text-muted"></span>';
-                btn.addEventListener('click', function () {
-                    if (!deptSelected.includes(d.id)) {
-                        deptSelected.push(d.id);
+                    row.querySelector('.dept-remove').addEventListener('click', function() {
+                        deptSelected.splice(idx, 1);
                         renderDeptFlow();
+                    });
+
+                    row.addEventListener('dragstart', handleDragStart);
+                    row.addEventListener('dragover', handleDragOver);
+                    row.addEventListener('drop', handleDrop);
+                    row.addEventListener('dragend', handleDragEnd);
+
+                    selEl.appendChild(row);
+                });
+
+                // emit hidden order inputs
+                const hidden = document.getElementById('deptOrderHidden');
+                hidden.innerHTML = '';
+                deptSelected.forEach((id, i) => {
+                    const inp = document.createElement('input');
+                    inp.type = 'hidden';
+                    inp.name = 'Input.DepartmentOrder[' + i + ']';
+                    inp.value = id;
+                    hidden.appendChild(inp);
+                });
+            }
+
+            // Is an embellishment-gated department currently allowed (its checkbox ticked)?
+            function isDeptGateActive(d) {
+                const gate = embellDeptType(d.type);
+                if (!gate) return true; // always-included departments
+                const el = document.getElementById(gate === 'printing' ? 'Input_EmbellishmentPrinting'
+                    : gate === 'embroidery' ? 'Input_EmbellishmentEmbroidery' : 'Input_EmbellishmentHandwork');
+                return el.checked;
+            }
+
+            // ---- Drag-to-reorder (native HTML5) ----
+            let dragFrom = null;
+
+            function handleDragStart(e) {
+                dragFrom = Number(e.currentTarget.dataset.idx);
+                e.currentTarget.classList.add('drag-over');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', String(dragFrom));
+            }
+
+            function handleDragOver(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                e.currentTarget.classList.add('drag-over');
+            }
+
+            function handleDrop(e) {
+                e.preventDefault();
+                e.currentTarget.classList.remove('drag-over');
+                if (dragFrom === null) return;
+                const to = Number(e.currentTarget.dataset.idx);
+                if (to !== dragFrom) {
+                    const [moved] = deptSelected.splice(dragFrom, 1);
+                    deptSelected.splice(to, 0, moved);
+                }
+                dragFrom = null;
+                renderDeptFlow();
+            }
+
+            function handleDragEnd(e) {
+                e.currentTarget.classList.remove('drag-over');
+                dragFrom = null;
+            }
+
+            // Embellishment checkboxes auto-add/remove their department
+            ['Input_EmbellishmentPrinting', 'Input_EmbellishmentEmbroidery', 'Input_EmbellishmentHandwork'].forEach(id => {
+                document.getElementById(id).addEventListener('change', function() {
+                    const type = id === 'Input_EmbellishmentPrinting' ? DEPT_TYPE.Printing
+                        : id === 'Input_EmbellishmentEmbroidery' ? DEPT_TYPE.Embroidery : DEPT_TYPE.HandWork;
+                    const dept = departments.find(d => d.type === type);
+                    if (this.checked) {
+                        if (dept && !deptSelected.includes(dept.id)) { deptSelected.push(dept.id); renderDeptFlow(); }
+                    } else {
+                        if (dept) { deptSelected = deptSelected.filter(x => x !== dept.id); renderDeptFlow(); }
                     }
                 });
-                availEl.appendChild(btn);
             });
 
-            const selEl = document.getElementById('deptSelected');
-            selEl.innerHTML = '';
-            document.getElementById('deptSelectedEmpty').classList.toggle('d-none', deptSelected.length > 0);
-
-            deptSelected.forEach((id, idx) => {
-                const d = departments.find(x => x.id === id);
-                if (!d) return;
-                const row = document.createElement('div');
-                row.className = 'list-group-item d-flex align-items-center gap-2 dept-row';
-                row.draggable = true;
-                row.dataset.idx = idx;
-                row.innerHTML =
-                    '<span class="badge text-bg-dark">' + (idx + 1) + '</span>' +
-                    '<span class="flex-grow-1">' + esc(d.name) + '</span>' +
-                    '<span class="bi bi-grip-vertical text-muted" title="Hold & slide to reorder"></span>' +
-                    '<button type="button" class="btn btn-sm btn-outline-danger dept-remove" title="Remove"><span class="bi bi-x"></span></button>';
-
-                row.querySelector('.dept-remove').addEventListener('click', function () {
-                    deptSelected.splice(idx, 1);
-                    renderDeptFlow();
-                });
-
-                row.addEventListener('dragstart', handleDragStart);
-                row.addEventListener('dragover', handleDragOver);
-                row.addEventListener('drop', handleDrop);
-                row.addEventListener('dragend', handleDragEnd);
-
-                selEl.appendChild(row);
+            // "Set As It Is" -> default flow
+            document.getElementById('btnSetDefault').addEventListener('click', function() {
+                deptSelected = defaultFlow();
+                renderDeptFlow();
             });
 
-            // emit hidden order inputs
-            const hidden = document.getElementById('deptOrderHidden');
-            hidden.innerHTML = '';
-            deptSelected.forEach((id, i) => {
-                const inp = document.createElement('input');
-                inp.type = 'hidden';
-                inp.name = 'Input.DepartmentOrder[' + i + ']';
-                inp.value = id;
-                hidden.appendChild(inp);
-            });
-        }
-
-        // Is an embellishment-gated department currently allowed (its checkbox ticked)?
-        function isDeptGateActive(d) {
-            const gate = embellDeptType(d.type);
-            if (!gate) return true; // always-included departments
-            const el = document.getElementById(gate === 'printing' ? 'Input_EmbellishmentPrinting'
-                : gate === 'embroidery' ? 'Input_EmbellishmentEmbroidery' : 'Input_EmbellishmentHandwork');
-            return el.checked;
-        }
-
-        // ---- Drag-to-reorder (native HTML5) ----
-        let dragFrom = null;
-
-        function handleDragStart(e) {
-            dragFrom = Number(e.currentTarget.dataset.idx);
-            e.currentTarget.classList.add('drag-over');
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', String(dragFrom));
-        }
-
-        function handleDragOver(e) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            e.currentTarget.classList.add('drag-over');
-        }
-
-        function handleDrop(e) {
-            e.preventDefault();
-            e.currentTarget.classList.remove('drag-over');
-            if (dragFrom === null) return;
-            const to = Number(e.currentTarget.dataset.idx);
-            if (to !== dragFrom) {
-                const [moved] = deptSelected.splice(dragFrom, 1);
-                deptSelected.splice(to, 0, moved);
-            }
-            dragFrom = null;
+            // Initialize: preserve a posted custom order if present, else default flow.
+            const postedOrder = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                                    Model.Input.DepartmentOrder ?? new List<int>(),
+                            new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+            deptSelected = (postedOrder && postedOrder.length > 0)
+                ? postedOrder.filter(id => departments.some(d => d.id === id))
+                : defaultFlow();
             renderDeptFlow();
-        }
-
-        function handleDragEnd(e) {
-            e.currentTarget.classList.remove('drag-over');
-            dragFrom = null;
-        }
-
-        // Embellishment checkboxes auto-add/remove their department
-        ['Input_EmbellishmentPrinting', 'Input_EmbellishmentEmbroidery', 'Input_EmbellishmentHandwork'].forEach(id => {
-            document.getElementById(id).addEventListener('change', function () {
-                const type = id === 'Input_EmbellishmentPrinting' ? DEPT_TYPE.Printing
-                    : id === 'Input_EmbellishmentEmbroidery' ? DEPT_TYPE.Embroidery : DEPT_TYPE.HandWork;
-                const dept = departments.find(d => d.type === type);
-                if (this.checked) {
-                    if (dept && !deptSelected.includes(dept.id)) { deptSelected.push(dept.id); renderDeptFlow(); }
-                } else {
-                    if (dept) { deptSelected = deptSelected.filter(x => x !== dept.id); renderDeptFlow(); }
-                }
-            });
-        });
-
-        // "Set As It Is" -> default flow
-        document.getElementById('btnSetDefault').addEventListener('click', function () {
-            deptSelected = defaultFlow();
-            renderDeptFlow();
-        });
-
-        // Initialize: preserve a posted custom order if present, else default flow.
-        const postedOrder = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
-            Model.Input.DepartmentOrder ?? new List<int>(),
-            new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
-        deptSelected = (postedOrder && postedOrder.length > 0)
-            ? postedOrder.filter(id => departments.some(d => d.id === id))
-            : defaultFlow();
-        renderDeptFlow();
-    })();
-</script>
+        })();
+    </script>
 }
+
+<!-- Select Fabric sidebar: pick a fabric code, see all its colors, set qty + Add -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="fabricPickerOffcanvas" aria-labelledby="fabricPickerLabel">
+    <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title" id="fabricPickerLabel">Select Fabric</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body d-flex flex-column p-0">
+        <div class="p-3 border-bottom">
+            <input type="text" class="form-control form-control-sm" id="fabricPickerSearch" placeholder="Search by code / type / invoice..." autocomplete="off" />
+        </div>
+        <div class="flex-grow-1 overflow-auto" id="fabricPickerList"></div>
+    </div>
+</div>
 
 <!-- Fabric creation modal -->
 <div class="modal fade" id="fabricModal" tabindex="-1" aria-hidden="true">
@@ -621,7 +647,9 @@
                     <div class="col-md-6">
                         <label class="form-label">Unit</label>
                         <select class="form-select" id="nfUnit">
-                            <option>Meter</option><option>Yard</option><option>Kg</option>
+                            <option>Meter</option>
+                            <option>Yard</option>
+                            <option>Kg</option>
                         </select>
                     </div>
                     <div class="col-md-6">

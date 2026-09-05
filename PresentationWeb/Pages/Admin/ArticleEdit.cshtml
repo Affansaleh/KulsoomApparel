@@ -35,7 +35,7 @@
 
     <div class="card shadow-sm">
         <div class="card-body">
-            <form method="post" onsubmit="window.buildFabricJson && window.buildFabricJson();">
+            <form method="post" onsubmit="return window.buildFabricJson ? window.buildFabricJson() : true;">
                 @Html.AntiForgeryToken()
                 <input type="hidden" asp-for="Id" />
                 <input type="hidden" asp-for="ExistingQtyJson" id="existingQtyJson" />
@@ -183,21 +183,13 @@
                 @if (!Model.CuttingStarted)
                 {
                     <h6 class="text-muted mb-3">Add More Fabrics</h6>
-                    <div class="row g-2 mb-2 align-items-center">
-                        <div class="col-md-7">
-                            <div class="position-relative">
-                                <input type="text" class="form-control" id="fabricSearch" placeholder="Search existing fabric by code / type / invoice..." autocomplete="off" />
-                                <div class="list-group position-absolute w-100 d-none" id="fabricSuggestions" style="z-index:1050; max-height:220px; overflow-y:auto;"></div>
-                            </div>
-                        </div>
-                        <div class="col-md-5 d-flex gap-2">
-                            <button type="button" class="btn btn-outline-primary btn-sm" id="addSelectedFabric">
-                                <span class="bi bi-plus-lg"></span> Add Selected
-                            </button>
-                            <button type="button" class="btn btn-outline-success btn-sm" id="openFabricModal">
-                                <span class="bi bi-patch-plus"></span> Add New Fabric
-                            </button>
-                        </div>
+                    <div class="d-flex gap-2 mb-2">
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="openFabricPicker">
+                            <span class="bi bi-list-check"></span> Select Fabric
+                        </button>
+                        <button type="button" class="btn btn-outline-success btn-sm" id="openFabricModal">
+                            <span class="bi bi-patch-plus"></span> Add New Fabric
+                        </button>
                     </div>
 
                     <div id="newFabricRows"></div>
@@ -220,14 +212,14 @@
         (function() {
             @{
                     var fabricsJson = System.Text.Json.JsonSerializer.Serialize(
-                                    Model.Fabrics.Select(f => new { f.Id, f.FabricCode, f.Color, f.FabricType, f.InvNum, f.Unit, f.AvailableQuantity }),
+                                                                            Model.Fabrics.Select(f => new { f.Id, f.FabricCode, f.Color, f.FabricType, f.InvNum, f.Unit, f.AvailableQuantity }),
                     new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
                 }
-                const fabrics = @Html.Raw(fabricsJson);
+                        const fabrics = @Html.Raw(fabricsJson);
             @{
                     var existingIdsJson = System.Text.Json.JsonSerializer.Serialize(Model.ExistingFabrics.Select(f => f.FabricId));
                 }
-                const existingIds = @Html.Raw(existingIdsJson);
+                        const existingIds = @Html.Raw(existingIdsJson);
             const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
 
             function esc(s) {
@@ -296,85 +288,107 @@
 
             function isExisting(id) { return (existingIds || []).indexOf(id) >= 0; }
 
-            const searchInput = document.getElementById('fabricSearch');
-            const suggestions = document.getElementById('fabricSuggestions');
+            // ---- Fabric picker sidebar: click a fabric code, see ALL its colors, set qty + Add each ----
+            const pickerOffcanvasEl = document.getElementById('fabricPickerOffcanvas');
+            const openFabricPickerBtn = document.getElementById('openFabricPicker');
 
             // The whole "Add More Fabrics" block is only rendered while Cutting has NOT
             // started. Guard every lookup so the rest of this script (and buildFabricJson)
             // still runs when the section is absent.
-            if (searchInput && suggestions) {
+            if (pickerOffcanvasEl && openFabricPickerBtn) {
 
-            function filter() {
-                const q = searchInput.value.trim().toLowerCase();
-                let list = fabrics.filter(f => !isExisting(f.id) && !newFabrics.some(n => n.id === f.id));
-                if (q) {
-                    list = list.filter(f =>
+                const pickerOffcanvas = new bootstrap.Offcanvas(pickerOffcanvasEl);
+                const pickerSearch = document.getElementById('fabricPickerSearch');
+                const pickerList = document.getElementById('fabricPickerList');
+                let openGroupCode = null;
+
+                function addFabric(f, qty) {
+                    if (isExisting(f.id) || newFabrics.some(n => n.id === f.id)) {
+                        showToast('That fabric color is already linked to this article.', 'warning');
+                        return;
+                    }
+                    newFabrics.push({ id: f.id, code: f.fabricCode, color: f.color, unit: f.unit, qty: qty || '' });
+                    renderNewFabrics();
+                }
+
+                function groupedFabrics(query) {
+                    const q = (query || '').trim().toLowerCase();
+                    const pool = fabrics.filter(f => !isExisting(f.id));
+                    const filtered = !q ? pool : pool.filter(f =>
                         f.fabricCode.toLowerCase().includes(q) ||
                         (f.color || '').toLowerCase().includes(q) ||
                         (f.fabricType || '').toLowerCase().includes(q) ||
                         (f.invNum || '').toLowerCase().includes(q));
+                    const map = {};
+                    filtered.forEach(function(f) { (map[f.fabricCode] ||= []).push(f); });
+                    return Object.entries(map);
                 }
-                suggestions.innerHTML = '';
-                if (!list.length) { suggestions.classList.add('d-none'); return; }
-                const groups = Object.values(list.reduce(function(map, f) {
-                    (map[f.fabricCode] ||= []).push(f); return map;
-                }, {}));
-                groups.slice(0, 8).forEach(function(group) {
-                    const first = group[0];
-                    const btn = document.createElement('button');
-                    btn.type = 'button';
-                    btn.className = 'list-group-item list-group-item-action d-flex justify-content-between';
-                    btn.innerHTML = '<span>' + esc(first.fabricCode) + '</span><span class="text-muted small">' + esc(first.fabricType || '') + ' · ' + group.length + ' color(s)</span>';
-                    btn.addEventListener('click', function() { renderColorChoices(group); });
-                    suggestions.appendChild(btn);
-                });
-                suggestions.classList.remove('d-none');
-            }
 
-            function renderColorChoices(group) {
-                suggestions.innerHTML = '<div class="list-group-item text-muted small">Select fabric color</div>';
-                group.forEach(function(f) {
-                    const colorBtn = document.createElement('button');
-                    colorBtn.type = 'button'; colorBtn.className = 'list-group-item list-group-item-action d-flex justify-content-between';
-                    colorBtn.innerHTML = '<strong>' + esc(f.color || 'Unspecified') + '</strong><span class="text-muted small">' + f.availableQuantity + ' ' + esc(f.unit) + '</span>';
-                    colorBtn.addEventListener('click', function() { addFabric(f); });
-                    suggestions.appendChild(colorBtn);
-                });
-                suggestions.classList.remove('d-none');
-            }
+                function renderPicker() {
+                    const groups = groupedFabrics(pickerSearch.value);
+                    pickerList.innerHTML = '';
+                    if (!groups.length) {
+                        pickerList.innerHTML = '<div class="text-muted small p-3">No fabrics found.</div>';
+                        return;
+                    }
+                    groups.forEach(function([code, variants]) {
+                        const isOpen = openGroupCode === code;
+                        const header = document.createElement('button');
+                        header.type = 'button';
+                        header.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+                        header.innerHTML = '<span>' + esc(code) + '</span>' +
+                            '<span class="text-muted small">' + esc(variants[0].fabricType || '') + ' · ' + variants.length + ' color(s) ' +
+                            '<span class="bi bi-chevron-' + (isOpen ? 'up' : 'down') + '"></span></span>';
+                        header.addEventListener('click', function() {
+                            openGroupCode = isOpen ? null : code;
+                            renderPicker();
+                        });
+                        pickerList.appendChild(header);
 
-            function addFabric(f) {
-                if (isExisting(f.id) || newFabrics.some(n => n.id === f.id)) {
-                    showToast('That fabric color is already linked to this article.', 'warning');
-                    return;
+                        if (!isOpen) return;
+
+                        variants.forEach(function(f) {
+                            const already = newFabrics.some(n => n.id === f.id);
+                            const row = document.createElement('div');
+                            row.className = 'p-2 border-bottom bg-body-tertiary';
+                            row.innerHTML =
+                                '<div class="d-flex justify-content-between align-items-center mb-1">' +
+                                '<span class="badge text-bg-light border">' + esc(f.color || 'Unspecified') + '</span>' +
+                                '<span class="text-muted small">Avail: ' + f.availableQuantity + ' ' + esc(f.unit) + '</span>' +
+                                '</div>' +
+                                '<div class="d-flex gap-2">' +
+                                '<input type="number" step="0.01" min="0" class="form-control form-control-sm picker-qty" placeholder="Qty used" ' + (already ? 'disabled' : '') + ' />' +
+                                '<button type="button" class="btn btn-sm ' + (already ? 'btn-outline-secondary' : 'btn-outline-primary') + ' picker-add flex-shrink-0" ' + (already ? 'disabled' : '') + '>' +
+                                (already ? 'Added' : '<span class="bi bi-plus-lg"></span> Add') +
+                                '</button>' +
+                                '</div>';
+
+                            if (!already) {
+                                const qtyInput = row.querySelector('.picker-qty');
+                                row.querySelector('.picker-add').addEventListener('click', function() {
+                                    const qty = qtyInput.value;
+                                    if (!(Number(qty) > 0)) {
+                                        showToast('Enter a quantity for ' + (f.color || code) + ' before adding.', 'warning');
+                                        return;
+                                    }
+                                    addFabric(f, qty);
+                                    renderPicker();
+                                });
+                            }
+                            pickerList.appendChild(row);
+                        });
+                    });
                 }
-                newFabrics.push({ id: f.id, code: f.fabricCode, color: f.color, unit: f.unit, qty: '' });
-                renderNewFabrics();
-                searchInput.value = '';
-                suggestions.classList.add('d-none');
-            }
 
-            searchInput.addEventListener('input', filter);
-            searchInput.addEventListener('focus', function() { filter(); });
-            document.addEventListener('click', function(e) {
-                if (!e.target.closest('.position-relative')) suggestions.classList.add('d-none');
-            });
-
-            // "Add Selected": if the typed code has several color variants, open the color
-            // list instead of silently grabbing the first variant.
-            document.getElementById('addSelectedFabric').addEventListener('click', function() {
-                const q = searchInput.value.trim().toLowerCase();
-                const matches = fabrics.filter(function(f) {
-                    return f.fabricCode.toLowerCase() === q && !isExisting(f.id) && !newFabrics.some(n => n.id === f.id);
+                openFabricPickerBtn.addEventListener('click', function() {
+                    openGroupCode = null;
+                    pickerSearch.value = '';
+                    renderPicker();
+                    pickerOffcanvas.show();
                 });
+                pickerSearch.addEventListener('input', renderPicker);
 
-                if (matches.length > 1) { renderColorChoices(matches); return; }
-                if (matches.length === 1) { addFabric(matches[0]); return; }
-
-                showToast('No matching, unlinked fabric found. Pick from the suggestions, or use "Add New Fabric".', 'warning');
-            });
-
-            } // end if (searchInput && suggestions)
+            } // end if (pickerOffcanvasEl && openFabricPickerBtn)
 
             // ============ Existing fabric qty + remove (staged) ============
             const efTable = document.getElementById('existingFabricsTable');
@@ -398,18 +412,32 @@
                 efTable.querySelectorAll('.ef-qty').forEach(function(inp) {
                     inp.addEventListener('input', syncQtyJson);
                 });
+
+                // Removing a linked fabric is confirmed via the app's own modal
+                // (same style as the "Confirm Undo" dialog), not the browser's confirm().
+                const removeFabricModalEl = document.getElementById('removeFabricModal');
+                const removeFabricModal = new bootstrap.Modal(removeFabricModalEl);
+                let pendingRemoveTr = null;
+
                 efTable.querySelectorAll('.ef-remove').forEach(function(btn) {
                     btn.addEventListener('click', function() {
-                        const tr = btn.closest('tr');
-                        const fid = Number(tr.getAttribute('data-fabric-id'));
-                        const code = tr.getAttribute('data-code');
-                        if (!confirm('Remove fabric ' + code + ' from this article? Its used quantity will be returned to stock on Save.')) return;
-                        removedIds.push(fid);
-                        removedIdsCsv.value = removedIds.join(',');
-                        tr.remove();
-                        syncQtyJson();
+                        pendingRemoveTr = btn.closest('tr');
+                        document.getElementById('removeFabricCode').textContent = pendingRemoveTr.getAttribute('data-code');
+                        removeFabricModal.show();
                     });
                 });
+
+                document.getElementById('confirmRemoveFabricBtn').addEventListener('click', function() {
+                    if (!pendingRemoveTr) return;
+                    const fid = Number(pendingRemoveTr.getAttribute('data-fabric-id'));
+                    removedIds.push(fid);
+                    removedIdsCsv.value = removedIds.join(',');
+                    pendingRemoveTr.remove();
+                    pendingRemoveTr = null;
+                    syncQtyJson();
+                    removeFabricModal.hide();
+                });
+
                 syncQtyJson();
             }
 
@@ -418,8 +446,11 @@
             const newLinksJson = document.getElementById('newFabricLinksJson');
 
             // Exposed so the form's inline onsubmit always calls it (robust even if listeners fail).
+            // Returns false to block the submit — previously a missing qty was just
+            // warned about and silently dropped, and since Save redirects straight to
+            // the article detail page, that warning toast was never actually seen and
+            // the fabric quietly never got linked.
             window.buildFabricJson = function() {
-                // Newly-added existing-fabric links: {fabricId: qty}
                 const addMap = {};
                 const missingQty = [];
                 newFabrics.forEach(function(s) {
@@ -430,18 +461,22 @@
                 stagedNewFabrics.forEach(function(s) {
                     if (!(Number(s.quantityUsed) > 0)) missingQty.push(s.fabric.code + ' (' + (s.fabric.color || '') + ', new)');
                 });
-                addedLinksJson.value = JSON.stringify(addMap);
 
-                if (missingQty.length && window.showToast) {
-                    showToast('Qty used is 0 or empty for: ' + missingQty.join(', ') + ' — those fabrics will NOT be linked.', 'warning');
+                if (missingQty.length) {
+                    if (window.showToast) {
+                        showToast('Set a quantity used for: ' + missingQty.join(', ') + ' before saving.', 'danger');
+                    }
+                    return false;
                 }
 
+                addedLinksJson.value = JSON.stringify(addMap);
                 // New fabrics to create + link: array of fabric objects + quantityUsed
                 newLinksJson.value = JSON.stringify(stagedNewFabrics);
 
                 // Also sync existing qty + removed ids.
                 syncQtyJson();
                 removedIdsCsv.value = removedIds.join(',');
+                return true;
             };
 
             // ============ Inline Add New Fabric modal ============
@@ -450,52 +485,52 @@
             const openFabricModalBtn = document.getElementById('openFabricModal');
             const nfSaveBtn = document.getElementById('nfSave');
             if (openFabricModalBtn && nfSaveBtn) {
-            openFabricModalBtn.addEventListener('click', function() {
-                document.getElementById('nfCode').value = '';
-                document.getElementById('nfType').value = '';
-            document.getElementById('nfColor').value = '';
-                document.getElementById('nfInv').value = '';
-                document.getElementById('nfQty').value = '';
-                document.getElementById('nfQtyUsed').value = '';
-                document.getElementById('nfDate').value = new Date().toISOString().slice(0, 10);
-                document.getElementById('nfUnit').value = 'Meter';
-                document.getElementById('nfRate').value = '';
-                document.getElementById('nfError').classList.add('d-none');
-                new bootstrap.Modal(document.getElementById('fabricModal')).show();
-            });
-
-            nfSaveBtn.addEventListener('click', function() {
-                const err = document.getElementById('nfError');
-                err.classList.add('d-none');
-
-                const code = document.getElementById('nfCode').value.trim();
-                const type = document.getElementById('nfType').value.trim();
-                const qty = document.getElementById('nfQty').value;
-                const qtyUsed = document.getElementById('nfQtyUsed').value;
-                if (!code || !type || !document.getElementById('nfColor').value.trim()) {
-                    err.textContent = 'Fabric code, type and color are required.';
-                    err.classList.remove('d-none');
-                    return;
-                }
-
-                // Stage the new fabric (NOT saved immediately). It becomes linked on Save Changes.
-                stagedNewFabrics.push({
-                    fabric: {
-                        code: code,
-                        invNum: document.getElementById('nfInv').value,
-                        date: document.getElementById('nfDate').value,
-                        type: type,
-                        color: document.getElementById('nfColor').value.trim(),
-                        quantity: qty || '0',
-                        unit: document.getElementById('nfUnit').value,
-                        rate: document.getElementById('nfRate').value || '0'
-                    },
-                    quantityUsed: qtyUsed || '0'
+                openFabricModalBtn.addEventListener('click', function() {
+                    document.getElementById('nfCode').value = '';
+                    document.getElementById('nfType').value = '';
+                    document.getElementById('nfColor').value = '';
+                    document.getElementById('nfInv').value = '';
+                    document.getElementById('nfQty').value = '';
+                    document.getElementById('nfQtyUsed').value = '';
+                    document.getElementById('nfDate').value = new Date().toISOString().slice(0, 10);
+                    document.getElementById('nfUnit').value = 'Meter';
+                    document.getElementById('nfRate').value = '';
+                    document.getElementById('nfError').classList.add('d-none');
+                    new bootstrap.Modal(document.getElementById('fabricModal')).show();
                 });
 
-                renderStagedNewFabrics();
-                bootstrap.Modal.getInstance(document.getElementById('fabricModal')).hide();
-            });
+                nfSaveBtn.addEventListener('click', function() {
+                    const err = document.getElementById('nfError');
+                    err.classList.add('d-none');
+
+                    const code = document.getElementById('nfCode').value.trim();
+                    const type = document.getElementById('nfType').value.trim();
+                    const qty = document.getElementById('nfQty').value;
+                    const qtyUsed = document.getElementById('nfQtyUsed').value;
+                    if (!code || !type || !document.getElementById('nfColor').value.trim()) {
+                        err.textContent = 'Fabric code, type and color are required.';
+                        err.classList.remove('d-none');
+                        return;
+                    }
+
+                    // Stage the new fabric (NOT saved immediately). It becomes linked on Save Changes.
+                    stagedNewFabrics.push({
+                        fabric: {
+                            code: code,
+                            invNum: document.getElementById('nfInv').value,
+                            date: document.getElementById('nfDate').value,
+                            type: type,
+                            color: document.getElementById('nfColor').value.trim(),
+                            quantity: qty || '0',
+                            unit: document.getElementById('nfUnit').value,
+                            rate: document.getElementById('nfRate').value || '0'
+                        },
+                        quantityUsed: qtyUsed || '0'
+                    });
+
+                    renderStagedNewFabrics();
+                    bootstrap.Modal.getInstance(document.getElementById('fabricModal')).hide();
+                });
             } // end if (openFabricModalBtn && nfSaveBtn)
 
             function renderStagedNewFabrics() {
@@ -518,6 +553,42 @@
         })();
     </script>
 }
+
+<!-- Select Fabric sidebar: pick a fabric code, see all its colors, set qty + Add -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="fabricPickerOffcanvas" aria-labelledby="fabricPickerLabel">
+    <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title" id="fabricPickerLabel">Select Fabric</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body d-flex flex-column p-0">
+        <div class="p-3 border-bottom">
+            <input type="text" class="form-control form-control-sm" id="fabricPickerSearch" placeholder="Search by code / type / invoice..." autocomplete="off" />
+        </div>
+        <div class="flex-grow-1 overflow-auto" id="fabricPickerList"></div>
+    </div>
+</div>
+
+<!-- Remove fabric confirmation modal (matches the app's "Confirm Undo" style) -->
+<div class="modal fade" id="removeFabricModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Remove Fabric</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Remove fabric <strong id="removeFabricCode"></strong> from this article?</p>
+                <p class="text-muted small mt-2 mb-0">Its used quantity will be returned to stock on Save.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmRemoveFabricBtn">
+                    <span class="bi bi-x-lg me-1"></span>Yes, Remove
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Fabric creation modal -->
 <div class="modal fade" id="fabricModal" tabindex="-1" aria-hidden="true">
