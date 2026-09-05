@@ -16,7 +16,7 @@
 
     @if (!ViewData.ModelState.IsValid)
     {
-        <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2"></div>
+        <div asp-validation-summary="All" class="alert alert-danger py-2"></div>
     }
 
     <div class="card shadow-sm">
@@ -46,7 +46,7 @@
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Delivery Date <span class="text-danger">*</span></label>
-                        <input asp-for="Input.DeliveryDate" type="date" class="form-control" required min="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                        <input asp-for="Input.DeliveryDate" type="date" class="form-control" required min="@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd")" />
                         <span asp-validation-for="Input.DeliveryDate" class="text-danger small"></span>
                     </div>
                     <div class="col-md-4">
