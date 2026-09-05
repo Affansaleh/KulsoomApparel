@@ -94,8 +94,8 @@ public class ArticleFormModel : PageModel
     // deduction happens once when the article is saved via CreateAsync → DeductForArticleAsync).
     public async Task<IActionResult> OnPostAddFabricAsync()
     {
-        if (string.IsNullOrWhiteSpace(NewFabric.FabricCode) || string.IsNullOrWhiteSpace(NewFabric.FabricType))
-            return new JsonResult(new { success = false, message = "Fabric code and type are required." });
+        if (string.IsNullOrWhiteSpace(NewFabric.FabricCode) || string.IsNullOrWhiteSpace(NewFabric.FabricType) || string.IsNullOrWhiteSpace(NewFabric.Color))
+            return new JsonResult(new { success = false, message = "Fabric code, type and color are required." });
 
         try
         {
@@ -105,6 +105,7 @@ public class ArticleFormModel : PageModel
                 success = true,
                 id = created.Id,
                 fabricCode = created.FabricCode,
+                color = created.Color,
                 unit = created.Unit,
                 availableQuantity = created.AvailableQuantity
             });
@@ -150,6 +151,7 @@ public class ArticleFormModel : PageModel
                     InvNum = GetStr(f, "invNum"),
                     FabricDate = GetDate(f, "date"),
                     FabricType = GetStr(f, "type"),
+                    Color = GetStr(f, "color") ?? string.Empty,
                     Quantity = GetDec(f, "quantity"),
                     Unit = GetStr(f, "unit"),
                     Rate = GetDec(f, "rate")

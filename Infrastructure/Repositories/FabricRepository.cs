@@ -46,9 +46,9 @@ public class FabricRepository : IFabricRepository
         _context.Fabrics.Update(fabric);
     }
 
-    public async Task<bool> FabricCodeExistsAsync(string fabricCode)
+    public async Task<bool> FabricVariantExistsAsync(string fabricCode, string color)
     {
-        return await _context.Fabrics.AnyAsync(f => f.FabricCode == fabricCode);
+        return await _context.Fabrics.AnyAsync(f => f.FabricCode == fabricCode && f.Color == color);
     }
 
     public async Task SaveChangesAsync()

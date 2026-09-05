@@ -16,7 +16,7 @@
 
     @if (!ViewData.ModelState.IsValid)
     {
-        <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2"></div>
+        <div asp-validation-summary="All" class="alert alert-danger py-2"></div>
     }
 
     <div class="card shadow-sm">
@@ -46,7 +46,7 @@
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Delivery Date <span class="text-danger">*</span></label>
-                        <input asp-for="Input.DeliveryDate" type="date" class="form-control" required min="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                        <input asp-for="Input.DeliveryDate" type="date" class="form-control" required min="@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd")" />
                         <span asp-validation-for="Input.DeliveryDate" class="text-danger small"></span>
                     </div>
                     <div class="col-md-4">
@@ -165,7 +165,7 @@
     (function () {
         @{
             var fabricsJson = System.Text.Json.JsonSerializer.Serialize(
-                Model.Fabrics.Select(f => new { f.Id, f.FabricCode, f.FabricType, f.InvNum, f.Unit, f.AvailableQuantity }),
+                Model.Fabrics.Select(f => new { f.Id, f.FabricCode, f.Color, f.FabricType, f.InvNum, f.Unit, f.AvailableQuantity }),
                 new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
         }
         const fabrics = @Html.Raw(fabricsJson);
@@ -192,7 +192,7 @@
                 row.className = 'row g-2 mb-2 align-items-center fabric-row';
                 row.innerHTML =
                     '<div class="col-md-5">' +
-                        '<span class="badge text-bg-secondary">' + esc(s.code) + '</span> ' +
+                        '<span class="badge text-bg-secondary">' + esc(s.code) + '</span> <span class="badge text-bg-light border">' + esc(s.color || '') + '</span> ' +
                         '<span class="text-muted small">(Avail: ' + s.avail + ' ' + s.unit + ')</span>' +
                     '</div>' +
                     '<div class="col-md-3">' +
@@ -224,6 +224,7 @@
             activeFabrics = fabrics.filter(f =>
                 !selected.some(s => s.id === f.id) &&
                 (f.fabricCode.toLowerCase().includes(q) ||
+                 (f.color || '').toLowerCase().includes(q) ||
                  (f.fabricType || '').toLowerCase().includes(q) ||
                  (f.invNum || '').toLowerCase().includes(q)));
             renderSuggestions();
@@ -235,13 +236,29 @@
                 suggestions.classList.add('d-none');
                 return;
             }
-            activeFabrics.slice(0, 8).forEach(f => {
+            const groups = Object.values(activeFabrics.reduce((map, f) => {
+                (map[f.fabricCode] ||= []).push(f); return map;
+            }, {}));
+            groups.slice(0, 8).forEach(group => {
+                const first = group[0];
                 const btn = document.createElement('button');
                 btn.type = 'button';
                 btn.className = 'list-group-item list-group-item-action d-flex justify-content-between';
-                btn.innerHTML =
-                    '<span>' + esc(f.fabricCode) + '</span>' +
-                    '<span class="text-muted small">' + esc(f.fabricType || '') + ' · ' + f.availableQuantity + ' ' + f.unit + '</span>';
+                btn.innerHTML = '<span>' + esc(first.fabricCode) + '</span>' +
+                    '<span class="text-muted small">' + esc(first.fabricType || '') + ' · ' + group.length + ' color(s)</span>';
+                btn.addEventListener('click', () => renderColorChoices(group));
+                suggestions.appendChild(btn);
+            });
+            suggestions.classList.remove('d-none');
+        }
+
+        function renderColorChoices(group) {
+            suggestions.innerHTML = '<div class="list-group-item text-muted small">Select fabric color</div>';
+            group.forEach(f => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'list-group-item list-group-item-action d-flex justify-content-between';
+                btn.innerHTML = '<strong>' + esc(f.color || 'Unspecified') + '</strong><span class="text-muted small">' + f.availableQuantity + ' ' + esc(f.unit) + '</span>';
                 btn.addEventListener('click', () => selectFabric(f));
                 suggestions.appendChild(btn);
             });
@@ -250,7 +267,7 @@
 
         function selectFabric(f) {
             if (!selected.some(s => s.id === f.id)) {
-                selected.push({ id: f.id, code: f.fabricCode, unit: f.unit, avail: f.availableQuantity, qty: '' });
+                selected.push({ id: f.id, code: f.fabricCode, color: f.color, unit: f.unit, avail: f.availableQuantity, qty: '' });
                 renderSelected();
             }
             searchInput.value = '';
@@ -258,16 +275,22 @@
         }
 
         searchInput.addEventListener('input', filter);
-        searchInput.addEventListener('focus', () => { if (activeFabrics.length) suggestions.classList.remove('d-none'); });
+        searchInput.addEventListener('focus', () => { filter(); });
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.position-relative')) suggestions.classList.add('d-none');
         });
 
+        // "Add Selected": if the typed code has several color variants, open the color
+        // list instead of silently grabbing the first variant.
         document.getElementById('addSelectedFabric').addEventListener('click', function () {
             const q = searchInput.value.trim().toLowerCase();
-            const match = fabrics.find(f => f.fabricCode.toLowerCase() === q);
-            if (match) { selectFabric(match); }
-            else { showToast('No matching fabric found. Type a code and pick from the list, or use "Add New Fabric".', 'warning'); }
+            const matches = fabrics.filter(f =>
+                f.fabricCode.toLowerCase() === q && !selected.some(s => s.id === f.id));
+
+            if (matches.length > 1) { renderColorChoices(matches); return; }
+            if (matches.length === 1) { selectFabric(matches[0]); return; }
+
+            showToast('No matching fabric found. Type a code and pick from the list, or use "Add New Fabric".', 'warning');
         });
 
         // ---- Add New Fabric: create master immediately, then stage the link ----
@@ -276,6 +299,7 @@
         document.getElementById('openFabricModal').addEventListener('click', function () {
             document.getElementById('nfCode').value = '';
             document.getElementById('nfType').value = '';
+            document.getElementById('nfColor').value = '';
             document.getElementById('nfInv').value = '';
             document.getElementById('nfQty').value = '';
             document.getElementById('nfQtyUsed').value = '';
@@ -292,8 +316,8 @@
 
             const code = document.getElementById('nfCode').value.trim();
             const type = document.getElementById('nfType').value.trim();
-            if (!code || !type) {
-                err.textContent = 'Fabric code and type are required.';
+            if (!code || !type || !document.getElementById('nfColor').value.trim()) {
+                err.textContent = 'Fabric code, type and color are required.';
                 err.classList.remove('d-none');
                 return;
             }
@@ -302,6 +326,7 @@
             const body = new URLSearchParams();
             body.append('NewFabric.FabricCode', code);
             body.append('NewFabric.FabricType', type);
+            body.append('NewFabric.Color', document.getElementById('nfColor').value);
             body.append('NewFabric.InvNum', document.getElementById('nfInv').value);
             body.append('NewFabric.FabricDate', document.getElementById('nfDate').value);
             body.append('NewFabric.Quantity', document.getElementById('nfQty').value || '0');
@@ -327,7 +352,7 @@
             // 2) Stage the created fabric so it links to the article on Create Article.
             const qtyUsed = document.getElementById('nfQtyUsed').value || '0';
             if (!stagedNewFabrics.some(s => s.id === data.id)) {
-                stagedNewFabrics.push({ id: data.id, code: data.fabricCode, quantityUsed: qtyUsed });
+                stagedNewFabrics.push({ id: data.id, code: data.fabricCode, color: data.color, quantityUsed: qtyUsed });
             }
             renderStagedNewFabrics();
 
@@ -361,16 +386,23 @@
         const newLinksJson = document.getElementById('newFabricLinksJson');
         window.buildFabricJson = function () {
             const map = {};
+            const missingQty = [];
             selected.forEach(function (s) {
                 const q = Number(s.qty);
-                if (q > 0) map[s.id] = q;
+                if (q > 0) { map[s.id] = q; }
+                else { missingQty.push(s.code + (s.color ? ' (' + s.color + ')' : '')); }
             });
             stagedNewFabrics.forEach(function (s) {
                 const q = Number(s.quantityUsed);
-                if (q > 0) map[s.id] = q;
+                if (q > 0) { map[s.id] = q; }
+                else { missingQty.push(s.code + ' (new)'); }
             });
             fabricLinksJson.value = JSON.stringify(map);
             newLinksJson.value = '';
+
+            if (missingQty.length && window.showToast) {
+                showToast('Qty used is 0 or empty for: ' + missingQty.join(', ') + ' — those fabrics will NOT be linked.', 'warning');
+            }
         };
 
         // ---- Utilities ----
@@ -583,9 +615,13 @@
                         <input type="date" class="form-control" id="nfDate" />
                     </div>
                     <div class="col-md-6">
+                        <label class="form-label">Fabric Color <span class="text-danger">*</span></label>
+                        <input class="form-control" id="nfColor" />
+                    </div>
+                    <div class="col-md-6">
                         <label class="form-label">Unit</label>
                         <select class="form-select" id="nfUnit">
-                            <option>Meter</option><option>Kilogram</option><option>Yard</option><option>Piece</option><option>Roll</option>
+                            <option>Meter</option><option>Yard</option><option>Kg</option>
                         </select>
                     </div>
                     <div class="col-md-6">

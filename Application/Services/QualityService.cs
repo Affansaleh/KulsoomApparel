@@ -34,6 +34,21 @@ public class QualityService : IQualityService
         if (dto.BGradeQuantity < 0 || dto.SizeBreakdowns.Any(x => x.Quantity < 0))
             throw new InvalidOperationException("All quality quantities must be whole numbers greater than or equal to zero.");
 
+        var cuttingSizes = article.CuttingSizeBreakdowns.OrderBy(x => x.OrderIndex).ToList();
+        if (cuttingSizes.Count == 0)
+            throw new InvalidOperationException("Cutting size breakdown is missing for this article.");
+        if (dto.SizeBreakdowns.Count != cuttingSizes.Count)
+            throw new InvalidOperationException("Quality size rows must exactly match the Cutting size table.");
+        foreach (var cutting in cuttingSizes)
+        {
+            var quality = dto.SizeBreakdowns.SingleOrDefault(x =>
+                string.Equals(x.SizeLabel.Trim(), cutting.SizeLabel.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (quality == null)
+                throw new InvalidOperationException($"Quality size '{cutting.SizeLabel}' is missing.");
+            if (quality.Quantity > cutting.Quantity)
+                throw new InvalidOperationException($"A-Grade quantity for size '{cutting.SizeLabel}' cannot exceed its Cutting quantity of {cutting.Quantity}.");
+        }
+
         var aGradeTotal = dto.SizeBreakdowns.Sum(sb => sb.Quantity);
         var input = qualityStatus.InputQuantity ?? 0;
         var maximumBGrade = Math.Max(0, input - aGradeTotal);

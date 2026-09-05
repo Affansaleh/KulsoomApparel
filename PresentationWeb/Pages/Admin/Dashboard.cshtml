@@ -134,6 +134,7 @@
                         <tr><th style="width:45%;">Fabric Code</th><td id="fbCode">—</td></tr>
                         <tr><th>Invoice #</th><td id="fbInv">—</td></tr>
                         <tr><th>Fabric Type</th><td id="fbType">—</td></tr>
+                        <tr><th>Color</th><td id="fbColor">—</td></tr>
                         <tr><th>Used Qty</th><td id="fbQty">—</td></tr>
                         <tr><th>Status</th><td id="fbStatus">—</td></tr>
                     </tbody>
@@ -194,10 +195,10 @@
                 const dayBadge = r.isDelivered
                     ? '<span class="badge text-bg-secondary">Delivered</span>'
                     : r.isOverdue
-                        ? `<span class="badge text-bg-danger">Overdue by ${Math.abs(r.daysLeft)}d</span>`
+                        ? `<span class="badge text-bg-danger">Overdue by ${Math.abs(r.daysLeft)} days</span>`
                         : (r.isDueSoon
-                            ? `<span class="badge text-bg-warning text-dark">${r.daysLeft}d left</span>`
-                            : `<span class="badge text-bg-light text-dark border">${r.daysLeft}d</span>`);
+                            ? `<span class="badge text-bg-warning text-dark">${r.daysLeft} days left</span>`
+                            : `<span class="badge text-bg-light text-dark border">${r.daysLeft} days</span>`);
 
                 const fabricCell = renderFabrics(r);
 
@@ -302,7 +303,8 @@
             document.getElementById('fbCode').textContent = f.fabricCode || '—';
             document.getElementById('fbInv').textContent = f.invNum || '—';
             document.getElementById('fbType').textContent = f.fabricType || '—';
-            document.getElementById('fbQty').textContent = f.quantityUsed;
+            document.getElementById('fbColor').textContent = f.color || '—';
+            document.getElementById('fbQty').textContent = f.quantityUsed + ' ' + (f.unit || '');
             const st = f.status === 'OutOfStock'
                 ? '<span class="badge text-bg-danger">Out Of Stock</span>'
                 : '<span class="badge text-bg-success">In Stock</span>';

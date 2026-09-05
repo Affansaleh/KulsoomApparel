@@ -22,6 +22,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<ArticleFabric> ArticleFabrics => Set<ArticleFabric>();
     public DbSet<ArticleAlternateCode> ArticleAlternateCodes => Set<ArticleAlternateCode>();
     public DbSet<ArticleSizeBreakdown> ArticleSizeBreakdowns => Set<ArticleSizeBreakdown>();
+    public DbSet<ArticleCuttingSizeBreakdown> ArticleCuttingSizeBreakdowns => Set<ArticleCuttingSizeBreakdown>();
     public DbSet<ArticleDepartmentStatus> ArticleDepartmentStatuses => Set<ArticleDepartmentStatus>();
     public DbSet<PasswordResetOtp> PasswordResetOtps => Set<PasswordResetOtp>();
     public DbSet<StatusLog> StatusLogs => Set<StatusLog>();
@@ -74,9 +75,10 @@ public class ApplicationDbContext : DbContext
         // ---------------- Fabric ----------------
         modelBuilder.Entity<Fabric>(e =>
         {
-            e.HasIndex(f => f.FabricCode).IsUnique();
+            e.HasIndex(f => new { f.FabricCode, f.Color }).IsUnique();
             e.Property(f => f.FabricCode).HasMaxLength(50).IsRequired();
             e.Property(f => f.FabricType).HasMaxLength(50).IsRequired();
+            e.Property(f => f.Color).HasMaxLength(50).IsRequired();
 
             e.Property(f => f.Quantity).HasPrecision(18, 2);
             e.Property(f => f.AvailableQuantity).HasPrecision(18, 2);
@@ -144,6 +146,17 @@ public class ApplicationDbContext : DbContext
              .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // ---------------- ArticleCuttingSizeBreakdown ----------------
+        modelBuilder.Entity<ArticleCuttingSizeBreakdown>(e =>
+        {
+            e.Property(sb => sb.SizeLabel).HasMaxLength(20).IsRequired();
+            e.HasIndex(sb => new { sb.ArticleId, sb.SizeLabel }).IsUnique();
+            e.HasOne(sb => sb.Article)
+             .WithMany(a => a.CuttingSizeBreakdowns)
+             .HasForeignKey(sb => sb.ArticleId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // ---------------- ArticleDepartmentStatus ----------------
         modelBuilder.Entity<ArticleDepartmentStatus>(e =>
         {
@@ -161,6 +174,9 @@ public class ApplicationDbContext : DbContext
              .WithMany()
              .HasForeignKey(ads => ads.UpdatedByUserId)
              .OnDelete(DeleteBehavior.Restrict);
+
+            e.Property(ads => ads.SamplingApprovalState).HasMaxLength(30);
+            e.Property(ads => ads.SamplingReviewNote).HasMaxLength(1000);
 
             e.HasIndex(ads => new { ads.ArticleId, ads.DepartmentId }).IsUnique();
         });

@@ -32,4 +32,9 @@ public class ArticleDepartmentStatusDto
     public DateTime? DeliveryDate { get; set; }
     public bool IsPinned { get; set; }
     public bool CanStart { get; set; }
+    public int SamplingAttemptCount { get; set; }
+    public string? SamplingApprovalState { get; set; }
+    public DateTime? SamplingSubmittedAt { get; set; }
+    public DateTime? SamplingReviewedAt { get; set; }
+    public string? SamplingReviewNote { get; set; }
 }

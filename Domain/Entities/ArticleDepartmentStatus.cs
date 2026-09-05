@@ -29,6 +29,14 @@ public class ArticleDepartmentStatus
     public DateTime? StartedAt { get; set; }
     public DateTime? EndedAt { get; set; }
 
+    // Sampling review workflow (used only by the Sampling department).
+    public int SamplingAttemptCount { get; set; }
+    public string? SamplingApprovalState { get; set; }
+    public DateTime? SamplingSubmittedAt { get; set; }
+    public DateTime? SamplingReviewedAt { get; set; }
+    public int? SamplingReviewedByUserId { get; set; }
+    public string? SamplingReviewNote { get; set; }
+
     public int? UpdatedByUserId { get; set; }
     public User? UpdatedBy { get; set; }
 }

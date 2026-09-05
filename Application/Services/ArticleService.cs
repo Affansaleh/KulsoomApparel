@@ -605,6 +605,20 @@ public class ArticleService : IArticleService
                             Quantity = size.Quantity
                         })
                     .ToList(),
+            CuttingSizeBreakdowns = article.CuttingSizeBreakdowns
+                .OrderBy(size => size.OrderIndex)
+                .Select(size => new SizeBreakdownEntryDto
+                {
+                    SizeLabel = size.SizeLabel,
+                    OrderIndex = size.OrderIndex,
+                    Quantity = size.Quantity
+                }).ToList(),
+            CuttingSizeTotal = article.CuttingSizeBreakdowns.Sum(x => x.Quantity),
+            PreQualityLossQuantity = Math.Max(0,
+                article.CuttingSizeBreakdowns.Sum(x => x.Quantity) -
+                (article.DepartmentStatuses.FirstOrDefault(x => x.Department.Type == DepartmentType.QualityAndPacking)?.InputQuantity ?? article.CuttingSizeBreakdowns.Sum(x => x.Quantity))),
+            CGradeQuantity = Math.Max(0,
+                (article.DepartmentStatuses.FirstOrDefault(x => x.Department.Type == DepartmentType.QualityAndPacking)?.InputQuantity ?? 0) - aGrade - bGrade),
             PackedBy = article.PackedBy,
             CheckedBy = article.CheckedBy,
             NoOfCartons = article.NoOfCartons,
@@ -630,6 +644,8 @@ public class ArticleService : IArticleService
                                 link.Fabric?.FabricType,
                             InvNum =
                                 link.Fabric?.InvNum,
+                            Color = link.Fabric?.Color,
+                            Unit = link.Fabric?.Unit.ToString(),
                             Status =
                                 link.Fabric?.Status
                                     .ToString()

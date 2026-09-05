@@ -59,6 +59,12 @@ public class ArticleResponseDto
 
     public List<SizeBreakdownEntryDto> SizeBreakdowns { get; set; } = new();
 
+    public List<SizeBreakdownEntryDto> CuttingSizeBreakdowns { get; set; } = new();
+
+    public int CuttingSizeTotal { get; set; }
+    public int PreQualityLossQuantity { get; set; }
+    public int CGradeQuantity { get; set; }
+
     public string? PackedBy { get; set; }
 
     public string? CheckedBy { get; set; }

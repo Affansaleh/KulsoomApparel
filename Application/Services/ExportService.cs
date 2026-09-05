@@ -84,7 +84,8 @@ public class ExportService : IExportService
             includeSizeBreakdown
                 ? selectedArticles
                     .SelectMany(article =>
-                        article.SizeBreakdowns)
+                        article.SizeBreakdowns.Concat(article.CuttingSizeBreakdowns.Select(x => new Domain.Entities.ArticleSizeBreakdown
+                        { SizeLabel = x.SizeLabel, OrderIndex = x.OrderIndex, Quantity = x.Quantity })))
                     .OrderBy(size =>
                         size.OrderIndex)
                     .ThenBy(size =>
@@ -127,6 +128,7 @@ public class ExportService : IExportService
                 {
                     "Fabric Codes",
                     "Fabric Types",
+                    "Fabric Colors",
                     "Fabric Quantities Used"
                 });
         }
@@ -155,13 +157,15 @@ public class ExportService : IExportService
         {
             foreach (var sizeLabel in sizeLabels)
             {
-                headers.Add($"Size {sizeLabel}");
+                headers.Add($"Cutting {sizeLabel}");
+                headers.Add($"A-Grade {sizeLabel}");
             }
 
             headers.Add("A-Grade Total");
             headers.Add("B-Grade Quantity");
             headers.Add("Total Quality Output");
-            headers.Add("Quality & Packing Loss");
+            headers.Add("Loss Before Quality");
+            headers.Add("C-Grade / Quality Loss");
         }
 
         for (var index = 0;
@@ -230,11 +234,14 @@ public class ExportService : IExportService
                                 link.Fabric?.FabricType ?? string.Empty));
 
                 worksheet.Cell(rowNumber, columnNumber++)
+                    .Value = string.Join(", ", article.FabricLinks.Select(link => link.Fabric?.Color ?? string.Empty));
+
+                worksheet.Cell(rowNumber, columnNumber++)
                     .Value = string.Join(
                         ", ",
                         article.FabricLinks
                             .Select(link =>
-                                link.QuantityUsed.ToString()));
+                                $"{link.QuantityUsed} {link.Fabric?.Unit}"));
             }
 
             if (includePricing)
@@ -285,8 +292,10 @@ public class ExportService : IExportService
                                     sizeLabel,
                                     StringComparison.OrdinalIgnoreCase));
 
-                    worksheet.Cell(rowNumber, columnNumber++)
-                        .Value = sizeEntry?.Quantity ?? 0;
+                    var cuttingEntry = article.CuttingSizeBreakdowns.FirstOrDefault(size =>
+                        string.Equals(size.SizeLabel, sizeLabel, StringComparison.OrdinalIgnoreCase));
+                    worksheet.Cell(rowNumber, columnNumber++).Value = cuttingEntry?.Quantity ?? 0;
+                    worksheet.Cell(rowNumber, columnNumber++).Value = sizeEntry?.Quantity ?? 0;
                 }
 
                 var aGradeTotal =
@@ -318,8 +327,12 @@ public class ExportService : IExportService
                 worksheet.Cell(rowNumber, columnNumber++)
                     .Value = totalQualityOutput;
 
-                worksheet.Cell(rowNumber, columnNumber++)
-                    .Value = qualityLoss;
+                var cuttingTotal = article.CuttingSizeBreakdowns.Sum(x => x.Quantity);
+                var qualityInput = qualityStatus?.InputQuantity ?? cuttingTotal;
+                var preQualityLoss = Math.Max(0, cuttingTotal - qualityInput);
+                var cGradeLoss = Math.Max(0, qualityInput - aGradeTotal - bGradeTotal);
+                worksheet.Cell(rowNumber, columnNumber++).Value = preQualityLoss;
+                worksheet.Cell(rowNumber, columnNumber++).Value = cGradeLoss;
             }
 
             rowNumber++;

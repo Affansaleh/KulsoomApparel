@@ -47,6 +47,35 @@
         </div>
     }
 
+    @if (Model.DepartmentType == Domain.Enums.DepartmentType.Pattern && Model.SamplingApprovals.Any())
+    {
+        <div class="card shadow-sm border-warning mb-3">
+            <div class="card-header bg-warning-subtle fw-semibold">Sampling Approval Requests</div>
+            <div class="card-body table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead><tr><th>Article</th><th>Company</th><th>Attempt</th><th>Submitted</th><th class="text-end">Decision</th></tr></thead>
+                    <tbody>
+                    @foreach (var request in Model.SamplingApprovals)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@request.ArticleCode</td><td>@request.CompanyName</td>
+                            <td>@request.SamplingAttemptCount</td><td>@request.SamplingSubmittedAt?.ToString("dd MMM yyyy HH:mm")</td>
+                            <td class="text-end">
+                                <form method="post" asp-page-handler="ReviewSampling" class="d-inline-flex gap-2 align-items-center">
+                                    <input type="hidden" name="statusId" value="@request.Id" />
+                                    <input type="text" name="note" class="form-control form-control-sm" placeholder="Optional note" />
+                                    <button name="approved" value="true" class="btn btn-sm btn-success">Approve</button>
+                                    <button name="approved" value="false" class="btn btn-sm btn-danger">Reject</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
     <div class="card shadow-sm">
         <div class="card-header">
             Work Queue
@@ -333,7 +362,7 @@
 
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post"
+            <form method="post" id="endWorkForm"
                   asp-page-handler="End">
 
                 <input type="hidden"
@@ -374,24 +403,28 @@
                     }
                     else
                     {
-                        <div class="mb-2">
-                            <label class="form-label">
-                                Output Quantity
-                            </label>
-
-                            <input type="number"
-                                   name="outputQty"
-                                   min="0"
-                                   max=""
-                                   step="1"
-                                   inputmode="numeric"
-                                   class="form-control"
-                                   id="endOutputQty" />
-
-                            <div class="form-text small"
-                                 id="endQtyHint">
+                        @if (Model.DepartmentType == Domain.Enums.DepartmentType.Cutting)
+                        {
+                            <input type="hidden" name="cuttingSizeLabels" id="cuttingSizeLabels" />
+                            <input type="hidden" name="cuttingQuantities" id="cuttingQuantities" />
+                            <div class="table-responsive mb-2">
+                                <table class="table table-sm table-bordered align-middle mb-0">
+                                    <thead><tr><th>Size</th><th style="width:160px;">Cut Quantity</th></tr></thead>
+                                    <tbody id="cuttingSizeRows"></tbody>
+                                    <tfoot><tr><th>Total Cutting Output</th><th id="cuttingGrandTotal">0</th></tr></tfoot>
+                                </table>
                             </div>
-                        </div>
+                            <div class="form-text small">The size total will be saved as Cutting output.</div>
+                        }
+                        else
+                        {
+                            <div class="mb-2">
+                                <label class="form-label">Output Quantity</label>
+                                <input type="number" name="outputQty" min="0" max="" step="1"
+                                       inputmode="numeric" class="form-control" id="endOutputQty" />
+                                <div class="form-text small" id="endQtyHint"></div>
+                            </div>
+                        }
 
                         @if (Model.DepartmentType ==
                             Domain.Enums.DepartmentType.Stitching)
@@ -484,9 +517,9 @@
                             <thead>
                                 <tr>
                                     <th>Size</th>
-                                    <th style="width:140px;">
-                                        A-Grade Quantity
-                                    </th>
+                                    <th style="width:130px;">Cutting Qty</th>
+                                    <th style="width:140px;">A-Grade Quantity</th>
+                                    <th style="width:120px;">Difference</th>
                                 </tr>
                             </thead>
 
@@ -605,6 +638,7 @@
                             <tr>
                                 <th>Fabric Code</th>
                                 <th>Fabric Type</th>
+                                <th>Color</th>
                                 <th>Invoice</th>
                                 <th>Used Quantity</th>
                                 <th>Status</th>
@@ -847,6 +881,28 @@
                 return div.innerHTML;
             }
 
+            // Cutting uses the same fixed-size table style previously used by Quality.
+            const cuttingRows = document.getElementById("cuttingSizeRows");
+            if (cuttingRows) {
+                SIZES.forEach(function (size) {
+                    const row = document.createElement("tr");
+                    row.innerHTML = "<td class=\"fw-semibold\">" + escapeHtml(size) +
+                        "</td><td><input type=\"text\" class=\"form-control form-control-sm cutting-size-qty\" data-size=\"" +
+                        escapeHtml(size) + "\" inputmode=\"numeric\" pattern=\"[0-9]*\" /></td>";
+                    row.querySelector("input").addEventListener("input", function () {
+                        this.value = this.value.replace(/[^0-9]/g, "");
+                        document.getElementById("cuttingGrandTotal").textContent =
+                            Array.from(document.querySelectorAll(".cutting-size-qty")).reduce((t, x) => t + (Number(x.value) || 0), 0);
+                    });
+                    cuttingRows.appendChild(row);
+                });
+                document.getElementById("endWorkForm").addEventListener("submit", function () {
+                    const fields = Array.from(document.querySelectorAll(".cutting-size-qty"));
+                    document.getElementById("cuttingSizeLabels").value = fields.map(x => x.dataset.size).join("|");
+                    document.getElementById("cuttingQuantities").value = fields.map(x => x.value || "0").join("|");
+                });
+            }
+
             // Generic Start
             document
                 .querySelectorAll(".btn-start")
@@ -972,7 +1028,11 @@
 
                 tbody.innerHTML = "";
 
-                SIZES.forEach(function (size) {
+                const details = getArticleDetails(document.getElementById("qualityArticleId").value);
+                const cuttingSizes = (details && details.cuttingSizeBreakdowns) || [];
+                cuttingSizes.forEach(function (cut) {
+                    const size = cut.sizeLabel;
+                    const cuttingQty = Number(cut.quantity) || 0;
                     const row =
                         document.createElement("tr");
 
@@ -983,14 +1043,15 @@
                         "<td class=\"fw-semibold\">" +
                         escapeHtml(size) +
                         "</td>" +
+                        "<td class=\"cutting-qty\">" + cuttingQty + "</td>" +
                         "<td>" +
                         "<input type=\"text\" " +
                         "class=\"form-control form-control-sm size-qty\" " +
                         "data-size=\"" + escapeHtml(size) + "\" " +
                         "value=\"" + escapeHtml(savedValue) + "\" " +
                         "inputmode=\"numeric\" " +
-                        "pattern=\"[0-9]*\" />" +
-                        "</td>";
+                        "pattern=\"[0-9]*\" max=\"" + cuttingQty + "\" />" +
+                        "</td><td class=\"size-difference\">" + cuttingQty + "</td>";
 
                     const input =
                         row.querySelector(".size-qty");
@@ -1001,6 +1062,8 @@
                             this.value =
                                 this.value.replace(/[^0-9]/g, "");
 
+                            if (Number(this.value || 0) > cuttingQty) this.value = String(cuttingQty);
+                            row.querySelector(".size-difference").textContent = cuttingQty - (Number(this.value) || 0);
                             saveQualityValues();
                             updateGrandTotal();
                         });
@@ -1343,6 +1406,7 @@
                             "</td>" +
                             "<td>" +
                             escapeHtml(fabric.fabricType || "—") +
+                            "</td><td>" + escapeHtml(fabric.color || "—") +
                             "</td>" +
                             "<td>" +
                             escapeHtml(fabric.invNum || "—") +

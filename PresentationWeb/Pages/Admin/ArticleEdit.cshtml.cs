@@ -128,11 +128,23 @@ public class ArticleEditModel : PageModel
         // New fabrics to create + link.
         Input.NewFabricLinks = ParseNewFabricLinks(NewFabricLinksJson);
 
-        // Delivery Date must be after today and after the Order Date.
-        if (Input.DeliveryDate.Date <= DateTime.Today)
-            ModelState.AddModelError(nameof(Input.DeliveryDate), "Delivery date must be after today.");
-        else if (Input.DeliveryDate.Date <= OrderDate.Date)
+        // Recompute for the re-rendered page — otherwise a validation failure would show the
+        // "Add More Fabrics" block again for an article whose Cutting has already started.
+        var currentStatuses = await _workflowService.GetByArticleAsync(Id);
+        CuttingStarted = currentStatuses.Any(s =>
+            (s.DepartmentName ?? "").Equals("Cutting", System.StringComparison.OrdinalIgnoreCase)
+            && s.Status != "Pending");
+
+        // Delivery Date rules. An article that already has a past/today delivery date must stay
+        // editable — only reject a date the admin actually changed to an invalid one.
+        if (Input.DeliveryDate.Date <= OrderDate.Date)
             ModelState.AddModelError(nameof(Input.DeliveryDate), "Delivery date must be after the order date.");
+        else if (Input.DeliveryDate.Date != article.DeliveryDate.Date && Input.DeliveryDate.Date <= DateTime.Today)
+            ModelState.AddModelError(nameof(Input.DeliveryDate), "Delivery date must be after today.");
+
+        if (_stagedFabricPayloadInvalid)
+            ModelState.AddModelError(string.Empty,
+                "The staged fabric list could not be read. Please re-add the fabrics and save again.");
 
         if (!ModelState.IsValid)
             return Page();
@@ -155,7 +167,11 @@ public class ArticleEditModel : PageModel
         }
     }
 
-    private static Dictionary<int, decimal> ParseQtyJson(string json)
+    // Set when a staged-fabric JSON payload cannot be parsed, so the user gets an error
+    // instead of watching their fabrics silently disappear on Save.
+    private bool _stagedFabricPayloadInvalid;
+
+    private Dictionary<int, decimal> ParseQtyJson(string json)
     {
         var result = new Dictionary<int, decimal>();
         if (string.IsNullOrWhiteSpace(json)) return result;
@@ -168,7 +184,7 @@ public class ArticleEditModel : PageModel
                     result[fid] = qty;
             }
         }
-        catch { }
+        catch (JsonException) { _stagedFabricPayloadInvalid = true; }
         return result;
     }
 
@@ -183,7 +199,7 @@ public class ArticleEditModel : PageModel
     }
 
     // Parse the staged new-fabric JSON: array of { fabric: { code, invNum, date, type, quantity, unit, rate }, quantityUsed }
-    private static List<NewFabricLinkDto> ParseNewFabricLinks(string? json)
+    private List<NewFabricLinkDto> ParseNewFabricLinks(string? json)
     {
         var result = new List<NewFabricLinkDto>();
         if (string.IsNullOrWhiteSpace(json)) return result;
@@ -201,6 +217,7 @@ public class ArticleEditModel : PageModel
                     InvNum = GetStr(f, "invNum"),
                     FabricDate = GetDate(f, "date"),
                     FabricType = GetStr(f, "type"),
+                    Color = GetStr(f, "color") ?? string.Empty,
                     Quantity = GetDec(f, "quantity"),
                     Unit = GetStr(f, "unit"),
                     Rate = GetDec(f, "rate")
@@ -209,7 +226,7 @@ public class ArticleEditModel : PageModel
                 result.Add(new NewFabricLinkDto { Fabric = fabric, QuantityUsed = qtyUsed });
             }
         }
-        catch { }
+        catch (JsonException) { _stagedFabricPayloadInvalid = true; }
         return result;
     }
 

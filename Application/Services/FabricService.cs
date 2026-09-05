@@ -28,20 +28,32 @@ public class FabricService : IFabricService
 
     public async Task<FabricResponseDto> CreateAsync(FabricCreateDto dto)
     {
-        var exists = await _fabricRepository.FabricCodeExistsAsync(dto.FabricCode);
+        if (string.IsNullOrWhiteSpace(dto.Color))
+            throw new InvalidOperationException("Fabric color is required.");
+        var exists = await _fabricRepository.FabricVariantExistsAsync(dto.FabricCode.Trim(), dto.Color.Trim());
         if (exists)
-            throw new InvalidOperationException("This fabric code already exists.");
+            throw new InvalidOperationException("This fabric code and color already exist.");
 
-        var unit = Enum.TryParse<FabricUnit>(dto.Unit, true, out var parsedUnit)
-            ? parsedUnit
-            : FabricUnit.Meter;
+        if (!Enum.TryParse<FabricUnit>(dto.Unit, true, out var unit))
+            throw new InvalidOperationException("Unit must be Meter, Yard or Kg.");
+
+        // When another color of the same code exists, common master information stays identical.
+        var master = await _fabricRepository.GetByCodeAsync(dto.FabricCode.Trim());
+        if (master != null)
+        {
+            dto.FabricType = master.FabricType;
+            dto.InvNum = master.InvNum;
+            dto.FabricDate = master.FabricDate;
+            dto.Rate = master.Rate;
+        }
 
         var fabric = new Fabric
         {
             FabricCode = dto.FabricCode,
             InvNum = dto.InvNum,
             FabricDate = dto.FabricDate,
-            FabricType = dto.FabricType,
+            FabricType = dto.FabricType.Trim(),
+            Color = dto.Color.Trim(),
             Quantity = dto.Quantity ?? 0,
             AvailableQuantity = dto.Quantity ?? 0,
             Unit = unit,
@@ -118,6 +130,7 @@ public class FabricService : IFabricService
         InvNum = f.InvNum,
         FabricDate = f.FabricDate,
         FabricType = f.FabricType,
+        Color = f.Color,
         Quantity = f.Quantity,
         AvailableQuantity = f.AvailableQuantity,
         Unit = f.Unit.ToString(),

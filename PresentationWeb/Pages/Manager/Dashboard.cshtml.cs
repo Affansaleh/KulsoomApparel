@@ -42,6 +42,7 @@ public class DashboardModel : PageModel
     public Department? Department { get; set; }
 
     public List<ArticleDepartmentStatusDto> Statuses { get; set; } = new();
+    public List<ArticleDepartmentStatusDto> SamplingApprovals { get; set; } = new();
 
     public List<StitchingTeam> Teams { get; set; } = new();
 
@@ -71,6 +72,9 @@ public class DashboardModel : PageModel
 
         Statuses =
             await _workflowService.GetPendingByDepartmentAsync(deptId);
+
+        if (DepartmentType == DepartmentType.Pattern)
+            SamplingApprovals = await _workflowService.GetSamplingAwaitingApprovalAsync();
 
         Teams = Department.Teams
             .Where(t => t.IsActive)
@@ -141,7 +145,9 @@ public class DashboardModel : PageModel
         int statusId,
         int? outputQty,
         string? note,
-        string? stitchedBy)
+        string? stitchedBy,
+        string? cuttingSizeLabels,
+        string? cuttingQuantities)
     {
         var userId = int.TryParse(
             User.FindFirstValue(ClaimTypes.NameIdentifier),
@@ -151,13 +157,30 @@ public class DashboardModel : PageModel
 
         try
         {
+            var cuttingSizes = new List<CuttingSizeBreakdownEntryDto>();
+            if (!string.IsNullOrWhiteSpace(cuttingSizeLabels))
+            {
+                var labels = cuttingSizeLabels.Split('|');
+                var values = (cuttingQuantities ?? string.Empty).Split('|');
+                if (labels.Length != values.Length)
+                    throw new InvalidOperationException("The Cutting size table is incomplete.");
+                for (var i = 0; i < labels.Length; i++)
+                {
+                    if (!int.TryParse(values[i], out var qty) || qty < 0)
+                        throw new InvalidOperationException($"Invalid Cutting quantity for size '{labels[i]}'.");
+                    cuttingSizes.Add(new CuttingSizeBreakdownEntryDto
+                    { SizeLabel = labels[i], OrderIndex = i + 1, Quantity = qty });
+                }
+            }
+
             await _workflowService.EndWorkAsync(
                 new EndDepartmentWorkDto
                 {
                     ArticleDepartmentStatusId = statusId,
                     OutputQuantity = outputQty,
                     Note = note,
-                    StitchedBy = stitchedBy
+                    StitchedBy = stitchedBy,
+                    CuttingSizeBreakdowns = cuttingSizes
                 },
                 userId);
 
@@ -327,6 +350,21 @@ public class DashboardModel : PageModel
             TempData["ErrorMessage"] = ex.Message;
         }
 
+        return RedirectToPage("/Manager/Dashboard");
+    }
+
+    public async Task<IActionResult> OnPostReviewSamplingAsync(int statusId, bool approved, string? note)
+    {
+        var userId = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var uid) ? uid : 0;
+        try
+        {
+            await _workflowService.ReviewSamplingAsync(statusId, approved, note, userId);
+            TempData["SuccessMessage"] = approved ? "Sampling approved; Cutting is now unlocked." : "Sampling rejected; resampling returned to the Sampling manager.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
         return RedirectToPage("/Manager/Dashboard");
     }
 

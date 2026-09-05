@@ -98,34 +98,70 @@ public class WorkflowService : IWorkflowService
         if (status.Status != DepartmentStatus.InProcess)
             throw new InvalidOperationException("This department's work has not been started yet.");
 
-        // Pattern & Sampling don't track quantity - just carry the input quantity forward.
-        bool isQuantityless = status.Department.Type is DepartmentType.Pattern or DepartmentType.Sampling;
+        // Sampling submission waits for the Pattern manager's decision. It is not final Done yet.
+        if (status.Department.Type == DepartmentType.Sampling)
+        {
+            if (status.SamplingApprovalState == "AwaitingApproval")
+                throw new InvalidOperationException("This Sampling attempt is already waiting for Pattern approval.");
+
+            status.SamplingAttemptCount++;
+            status.SamplingApprovalState = "AwaitingApproval";
+            status.SamplingSubmittedAt = DateTime.UtcNow;
+            status.EndedAt = status.SamplingSubmittedAt;
+            status.OutputQuantity = status.InputQuantity;
+            status.LossQuantity = 0;
+            status.Note = dto.Note;
+            status.UpdatedByUserId = updatedByUserId;
+            _statusRepository.Update(status);
+            await _statusRepository.SaveChangesAsync();
+            await LogStatusChangeAsync(status, DepartmentStatus.InProcess, updatedByUserId,
+                $"Sampling attempt {status.SamplingAttemptCount} submitted for Pattern approval.");
+            return;
+        }
+
+        // Pattern doesn't track quantity - just carries the input quantity forward.
+        bool isQuantityless = status.Department.Type == DepartmentType.Pattern;
 
         if (isQuantityless)
         {
             status.OutputQuantity = status.InputQuantity;
             status.LossQuantity = 0;
         }
+        else if (status.Department.Type == DepartmentType.Cutting)
+        {
+            if (dto.CuttingSizeBreakdowns.Count == 0)
+                throw new InvalidOperationException("At least one Cutting size quantity is required.");
+            if (dto.CuttingSizeBreakdowns.Any(x => string.IsNullOrWhiteSpace(x.SizeLabel) || x.Quantity < 0))
+                throw new InvalidOperationException("Cutting sizes and quantities are invalid.");
+            if (dto.CuttingSizeBreakdowns.GroupBy(x => x.SizeLabel.Trim(), StringComparer.OrdinalIgnoreCase).Any(g => g.Count() > 1))
+                throw new InvalidOperationException("Duplicate Cutting sizes are not allowed.");
+
+            var article = await _articleRepository.GetByIdAsync(status.ArticleId)
+                ?? throw new InvalidOperationException("Article not found.");
+            article.CuttingSizeBreakdowns.Clear();
+            foreach (var entry in dto.CuttingSizeBreakdowns.OrderBy(x => x.OrderIndex))
+                article.CuttingSizeBreakdowns.Add(new ArticleCuttingSizeBreakdown
+                {
+                    SizeLabel = entry.SizeLabel.Trim(),
+                    OrderIndex = entry.OrderIndex,
+                    Quantity = entry.Quantity
+                });
+
+            status.OutputQuantity = dto.CuttingSizeBreakdowns.Sum(x => x.Quantity);
+            status.LossQuantity = status.InputQuantity.HasValue
+                ? Math.Max(0, status.InputQuantity.Value - status.OutputQuantity.Value)
+                : 0;
+            _articleRepository.Update(article);
+        }
         else
         {
             if (dto.OutputQuantity == null)
                 throw new InvalidOperationException("Output quantity is required to end work for this department.");
+            if (dto.OutputQuantity.Value > (status.InputQuantity ?? 0))
+                throw new InvalidOperationException($"Output quantity cannot exceed the input quantity. Maximum allowed is {status.InputQuantity ?? 0}.");
 
             status.OutputQuantity = dto.OutputQuantity;
-
-            // Cutting has no "input" baseline to compare against (it sets its own baseline).
-            if (status.Department.Type == DepartmentType.Cutting)
-            {
-                status.LossQuantity = 0;
-            }
-            else
-            {
-                // Every step after Cutting is bounded by the quantity it received.
-                if (dto.OutputQuantity.Value > (status.InputQuantity ?? 0))
-                    throw new InvalidOperationException($"Output quantity cannot exceed the input quantity. Maximum allowed is {status.InputQuantity ?? 0}.");
-
-                status.LossQuantity = (status.InputQuantity ?? 0) - dto.OutputQuantity.Value;
-            }
+            status.LossQuantity = (status.InputQuantity ?? 0) - dto.OutputQuantity.Value;
         }
 
         if (status.Department.Type == DepartmentType.Stitching)
@@ -184,7 +220,12 @@ public class WorkflowService : IWorkflowService
         DurationDisplay = (s.StartedAt.HasValue && s.EndedAt.HasValue)
             ? $"{(int)(s.EndedAt.Value - s.StartedAt.Value).TotalHours}h {(s.EndedAt.Value - s.StartedAt.Value).Minutes}m"
             : null,
-        UpdatedByUsername = null   // populate if needed via a User lookup
+        UpdatedByUsername = null,   // populate if needed via a User lookup
+        SamplingAttemptCount = s.SamplingAttemptCount,
+        SamplingApprovalState = s.SamplingApprovalState,
+        SamplingSubmittedAt = s.SamplingSubmittedAt,
+        SamplingReviewedAt = s.SamplingReviewedAt,
+        SamplingReviewNote = s.SamplingReviewNote
     };
 
     public async Task<List<ArticleDepartmentStatusDto>> GetPendingByDepartmentAsync(int departmentId)
@@ -192,7 +233,8 @@ public class WorkflowService : IWorkflowService
         var statuses = await _statusRepository.GetByDepartmentAsync(departmentId);
 
         var relevant = statuses
-            .Where(s => s.Status != DepartmentStatus.Done && !s.Article.IsDelivered)
+            .Where(s => s.Status != DepartmentStatus.Done && !s.Article.IsDelivered &&
+                        !(s.Department.Type == DepartmentType.Sampling && s.SamplingApprovalState == "AwaitingApproval"))
             .ToList();
 
         var result = new List<ArticleDepartmentStatusDto>();
@@ -225,6 +267,54 @@ public class WorkflowService : IWorkflowService
             .ToList();
     }
 
+
+    public async Task<List<ArticleDepartmentStatusDto>> GetSamplingAwaitingApprovalAsync()
+    {
+        var statuses = await _statusRepository.GetSamplingAwaitingApprovalAsync();
+        return statuses.Select(s =>
+        {
+            var dto = MapToDto(s);
+            dto.ArticleCode = s.Article.ArticleCode;
+            dto.CompanyName = s.Article.CompanyName;
+            dto.DeliveryDate = s.Article.DeliveryDate;
+            dto.IsPinned = s.Article.IsPinned;
+            return dto;
+        }).OrderByDescending(x => x.IsPinned).ThenBy(x => x.SamplingSubmittedAt).ToList();
+    }
+
+    public async Task ReviewSamplingAsync(int statusId, bool approved, string? note, int reviewedByUserId)
+    {
+        var status = await _statusRepository.GetByIdAsync(statusId)
+            ?? throw new InvalidOperationException("Sampling workflow record not found.");
+        if (status.Department.Type != DepartmentType.Sampling || status.SamplingApprovalState != "AwaitingApproval")
+            throw new InvalidOperationException("This Sampling attempt is not waiting for approval.");
+
+        status.SamplingReviewedAt = DateTime.UtcNow;
+        status.SamplingReviewedByUserId = reviewedByUserId;
+        status.SamplingReviewNote = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        status.UpdatedByUserId = reviewedByUserId;
+
+        if (approved)
+        {
+            status.SamplingApprovalState = "Approved";
+            status.Status = DepartmentStatus.Done;
+            // EndedAt remains the Sampling manager's final submission time.
+        }
+        else
+        {
+            status.SamplingApprovalState = "Rejected";
+            status.Status = DepartmentStatus.InProcess;
+            status.StartedAt = DateTime.UtcNow;
+            status.EndedAt = null;
+            status.OutputQuantity = null;
+            status.LossQuantity = null;
+        }
+
+        _statusRepository.Update(status);
+        await _statusRepository.SaveChangesAsync();
+        await LogStatusChangeAsync(status, DepartmentStatus.InProcess, reviewedByUserId,
+            approved ? "Sampling approved by Pattern." : "Sampling rejected by Pattern; resampling requested.");
+    }
 
     public async Task UndoLastDepartmentAsync(int articleId, int updatedByUserId)
     {

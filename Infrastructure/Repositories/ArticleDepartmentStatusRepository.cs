@@ -41,6 +41,7 @@ public class ArticleDepartmentStatusRepository : IArticleDepartmentStatusReposit
         return await _context.ArticleDepartmentStatuses
             .Where(ads => ads.DepartmentId == departmentId)
             .Include(ads => ads.Article)
+            .Include(ads => ads.Department)
             .ToListAsync();
     }
 
@@ -50,6 +51,17 @@ public class ArticleDepartmentStatusRepository : IArticleDepartmentStatusReposit
             .Where(ads => ads.ArticleId == articleId && ads.SequenceNumber > currentSequenceNumber)
             .OrderBy(ads => ads.SequenceNumber)
             .FirstOrDefaultAsync();
+    }
+
+    public async Task<List<ArticleDepartmentStatus>> GetSamplingAwaitingApprovalAsync()
+    {
+        return await _context.ArticleDepartmentStatuses
+            .Where(x => x.Department.Type == Domain.Enums.DepartmentType.Sampling &&
+                        x.SamplingApprovalState == "AwaitingApproval" && !x.Article.IsDelivered)
+            .Include(x => x.Department)
+            .Include(x => x.Article)
+            .OrderBy(x => x.SamplingSubmittedAt)
+            .ToListAsync();
     }
 
     public void Update(ArticleDepartmentStatus status)
